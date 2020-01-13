@@ -1,0 +1,180 @@
+@charset "utf-8";
+
+$dark-background: hsl(0, 0%, 14%);
+$white-text: hsl(0, 0%, 96%);
+$dark: $dark-background;
+$background: $dark-background;
+$text: $white-text;
+$modal-content-width: 1000px;
+
+@import "../node_modules/bulma/bulma.sass";
+@import "loader.scss";
+@import "gallery.scss";
+
+
+
+.navbar {
+    display: flex;
+    justify-content: center;    
+
+    .navbar-menu-custom {
+        display: flex;
+        justify-content: center;
+    
+        .navbar-start {
+            display: flex;
+            justify-content: center;
+
+            @media(max-width: 500px){
+                font-size: 1.75rem;
+            }
+        }
+    }
+
+    .navbar-burger {
+        display: none;
+    }
+}
+
+.navbar-start {
+    margin: auto;
+
+    .navbar-item {
+        padding: 0;
+        margin: 0.75rem 1rem;
+        color: $white-text;
+        background-color: transparent !important;
+
+        &:before {
+            content: "";
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            bottom: 0;
+            left: 0;
+            background-color: $white-text;
+            visibility: hidden;            
+            transform: scaleX(0);
+            transition: all 0.2s ease-in-out 0s;
+        }
+
+        &.active {
+            text-shadow: 0 0 4px rgba(255,255,255,0.9);
+
+            &:before {
+                visibility: visible;
+                transform: scaleX(1);
+            }
+        }
+
+        &:hover {
+            text-shadow: 0 0 4px rgba(255,255,255,0.9);
+            color: $white-text;
+            
+            &:before {
+                visibility: visible;
+                transform: scaleX(1);
+            }
+        }
+
+        &:focus {
+            color: $white-text; 
+        }
+    }
+}
+
+.navbar {
+    background: transparent;
+    font-size: 2.25rem;
+    font-weight: 300;
+}
+
+.nav-container {
+    transition: transform 0.3s ease-in-out;
+    transform: none;
+    z-index: 30;
+
+    &.centered {
+        transform: translateY(40vh);
+        transition: transform 0.3s ease-in-out;
+    }
+}
+
+body {
+    background: rgb(35,21,64);
+    background: linear-gradient(0deg, rgba(35,21,64,1) 0%, rgba(28,2,64,1) 100%);
+    width: 100%;
+    min-height: 100vh;
+    font-family: 'Raleway', sans-serif;
+
+    font-family: 'Quicksand', sans-serif;
+
+    font-family: 'Abel', sans-serif;
+
+    font-family: 'Overpass', sans-serif;
+
+    font-family: 'Cairo', sans-serif;
+
+    font-family: 'Rajdhani', sans-serif;    
+
+    font-family: 'Economica', sans-serif;
+
+    font-family: 'Josefin Slab', serif;
+
+    font-family: 'Advent Pro', sans-serif;
+
+    font-family: 'Poiret One', cursive;
+}
+
+html{
+    height: 100%;
+}
+
+
+
+#backgroundOverlay {
+    background-color: rgba(0, 0, 0, 0.7);
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    transition: transform 0.5s ease-in-out;  
+    transition-delay: 0.1s;  
+    transform: scale(1);
+    transform-origin: top center;
+
+    &.hidden {
+        transition: transform 0.5s ease-in-out;
+        transition-delay: 0.1s;
+        transform: scale(0);
+        height: 0;
+        width: 0;
+    }
+}
+
+#blazor-error-ui {   
+    bottom: 0;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+.background-video {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    min-width: 100%;
+    min-height: 100%;
+    object-fit: cover;
+
+    &#backgroundVideoIntro {
+        z-index: 15;
+    }
+
+    &.hidden {
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+}

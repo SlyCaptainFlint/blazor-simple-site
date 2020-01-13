@@ -1,0 +1,14 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime;
+
+<video id="backgroundVideoIntro" class="background-video">
+    <source type="video/mp4"
+          src="intro.mp4">
+</video>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop");
+    }
+}

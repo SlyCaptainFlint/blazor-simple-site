@@ -1,0 +1,16 @@
+{
+  "name": "styles-build",
+  "version": "1.0.0",
+  "private": true,
+  "main": "sass/mystyles.scss",
+  "license": "unlicensed",
+  "devDependencies": {
+    "bulma": "^0.7.2",
+    "node-sass": "^4.9.2"
+  },
+  "scripts": {
+    "css-build": "node-sass --omit-source-map-url sass/overrides.scss wwwroot/css/site.css",
+    "css-watch": "npm run css-build -- --watch",
+    "start": "npm run css-watch"
+  }
+}

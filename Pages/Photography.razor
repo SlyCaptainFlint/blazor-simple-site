@@ -1,0 +1,104 @@
+﻿@page "/photography"
+@inject HttpClient Http
+@inject MainContainerSizeProvider SizeProvider
+
+@if (Photos == null || Photos.Count == 0)
+{    
+    <div class="loader-container">
+        <div class="ui-loader"></div>
+    </div>    
+}
+else
+{
+    <div class="gallery">
+        @foreach(var photo in Photos)
+        {
+            <div class="clipped-border @photo.ImageCollapsedClass" style="width: @(PhotoWidth)px; height: @(PhotoWidth)px" @onclick="@(()=>SelectPhoto(@photo.Id))">
+                <img class="@photo.ImageHiddenClass" src=@photo.Url_m @onload="@(()=>ShowPhoto(@photo.Id))" @onerror="@(()=>CollapsePhoto(@photo.Id))"/>
+            </div>
+        }
+    </div>   
+}
+
+<div id="photoShowcase" class="modal @ModalCssClass">
+    <div class="modal-background" @onclick=CloseModal></div>
+    <div class="modal-content is-clipped">
+        <img class="@ShowcasePhotoCssClass" src=@ShowcasePhotoUrl alt="" @onload=ShowShowcasePhoto>
+    </div>
+    <button class="modal-close is-large" aria-label="close" @onclick=CloseModal></button>
+</div>
+
+@code {
+    private bool showModal = false;
+    private string ModalCssClass => showModal ? "is-active" : null;
+    private bool hideShowcasePhoto = true;
+    private string ShowcasePhotoCssClass => hideShowcasePhoto ? "hidden": "";    
+    private List<Photo> Photos = new List<Photo>();
+    private float PhotoWidth { get; set; } = 0;
+    private string ShowcasePhotoUrl { get; set; }
+    private string PreviewPhotoBaseUrl { get; set; } = "https://ozinoveva.s3-us-west-2.amazonaws.com/medium/";    
+    private string ShowcasePhotoBaseUrl { get; set; } = "https://ozinoveva.s3-us-west-2.amazonaws.com/large/";
+
+    private void CloseModal()
+    {
+        showModal = false;
+        ShowcasePhotoUrl = "";
+        hideShowcasePhoto = true;
+    }
+
+    // Unhides showcase photo once it is loaded (this avoids partially loaded content from displaying)
+    private void ShowShowcasePhoto()
+    {
+        hideShowcasePhoto = false;
+    }
+
+    private void SelectPhoto(int id)
+    {
+        var selectedPhoto = Photos.Find(x => x.Id == id);
+        ShowcasePhotoUrl = selectedPhoto.Url_l;
+        showModal = true;
+    }
+
+    // Unhides a photo in the gallery once it is loaded (this avoids partially loaded content from displaying)
+    private void ShowPhoto(int id)
+    {
+        var selectedPhoto = Photos.Find(x => x.Id == id);
+        selectedPhoto.ImageHidden = false;
+    }
+
+    // Hides containers for any photos that may not exist
+    private void CollapsePhoto(int id)
+    {
+        var selectedPhoto = Photos.Find(x => x.Id == id);
+        selectedPhoto.ImageCollapsed = true;
+    }
+
+    protected override void OnInitialized()
+    {        
+        for(var i = 0; i < 30; i++)
+        {
+            var photo = new Photo()  
+            {
+                Id = i,
+                Url_l = $"{ShowcasePhotoBaseUrl}{i}.jpg",
+                Url_m = $"{PreviewPhotoBaseUrl}{i}.jpg",
+                ImageHidden = true
+            };
+
+            Photos.Add(photo);            
+        }     
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Calculate width for each photo such that all available horizontal space gets used up          
+            var minWidth = 300;
+            var dimensions = await SizeProvider.GetDimensions();
+            var containerWidth = dimensions.Width;        
+            int photosInRow = containerWidth/minWidth;
+            PhotoWidth = containerWidth/photosInRow;   
+        }
+    }
+}

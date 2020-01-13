@@ -1,0 +1,28 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+
+<video id="backgroundVideoLoop" class="background-video" loop>
+    <source type="video/mp4"
+          src="loop.mp4">
+</video>
+
+<div id="backgroundOverlay" class="@OverlayCssClass"></div>
+
+<div id="navContainer" class="nav-container @NavContainerCssClass">
+    <NavMenu />
+</div>
+
+<div id="MainBodyContainer" class="container is-fluid">    
+    @Body
+</div>
+
+
+@code {
+
+    // Determine if we are on the main page so we can style certain parts of the layout differently.
+    private bool isMainPage => NavigationManager.Uri == NavigationManager.BaseUri;
+
+    private string NavContainerCssClass => isMainPage ? "centered": "";
+
+    private string OverlayCssClass => isMainPage ? "hidden": "";
+}
