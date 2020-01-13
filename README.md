@@ -4,6 +4,7 @@ This is a basic working example of a personal website built primarily with Blazo
 To run locally, you must first set up and run the SASS build pipeline.
 
 `npm install`
+
 `npm run start`
 
 This will run the build pipeline in watch mode, so if you make any changes to the SASS files and save them, the CSS will be updated automatically.
