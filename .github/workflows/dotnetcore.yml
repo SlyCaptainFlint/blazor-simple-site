@@ -12,7 +12,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core
+    - name: Set up Node
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+    - name: Compile SASS
+      run: npm install && npm run start
+    - name: Set up .NET Core
       uses: actions/setup-dotnet@v1
       with:
         dotnet-version: 3.1.100
