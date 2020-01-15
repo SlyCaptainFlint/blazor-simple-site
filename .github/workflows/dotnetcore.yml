@@ -17,7 +17,7 @@ jobs:
       with:
         node-version: 12.x
     - name: Compile SASS
-      run: npm install && npm run start
+      run: npm install && npm run css-build
     - name: Set up .NET Core
       uses: actions/setup-dotnet@v1
       with:
