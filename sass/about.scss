@@ -1,0 +1,17 @@
+#aboutMainContent {
+    font-family: 'Cairo', sans-serif;
+}
+
+#aboutPageContainer {
+    animation: aboutPageFade 2s; 
+}
+
+@keyframes aboutPageFade {
+    0% {
+        opacity: 0;
+    
+    }
+    100% {    
+        opacity: 1
+    }
+}
