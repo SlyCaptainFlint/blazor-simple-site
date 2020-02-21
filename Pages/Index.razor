@@ -9,6 +9,9 @@
 @code {
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop");
+        if(firstRender)
+        {
+            JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop");
+        }        
     }
 }

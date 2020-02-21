@@ -1,4 +1,5 @@
 ﻿@page "/photography"
+@inject IJSRuntime JSRuntime;
 @inject HttpClient Http
 @inject MainContainerSizeProvider SizeProvider
 
@@ -98,7 +99,8 @@ else
             var dimensions = await SizeProvider.GetDimensions();
             var containerWidth = dimensions.Width;        
             int photosInRow = containerWidth/minWidth;
-            PhotoWidth = containerWidth/photosInRow;   
+            PhotoWidth = containerWidth/photosInRow; 
+            JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop"); 
         }
     }
 }

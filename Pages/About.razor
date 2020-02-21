@@ -1,56 +1,62 @@
 ﻿@page "/about"
+@inject IJSRuntime JSRuntime;
 
 <div id="aboutPageContainer" class="container">
-  <div class="tile is-ancestor">
-    <div class="tile is-4 is-vertical is-parent">
-      <div class="tile is-child">
-        <div class="card">
-          <div class="card-image">
-              <figure class="image is-2by3">
-              <img src="https://ozinoveva.s3-us-west-2.amazonaws.com/etc/portrait.jpg" alt="Portrait">
-              </figure>
-          </div>
-          <div class="card-content">
-              <div class="media">
-                  <div class="media-content">
-                      <p class="title is-2">Olga Zinoveva</p>
-                      <p class="subtitle is-4">Software engineer, builder, artist.</p>
-                  </div>
-              </div>
-          </div>
-          </div>
-      </div>
+    <div class="tile is-ancestor">
+        <div class="tile is-4 is-vertical is-parent">
+            <div class="tile is-child">
+                <div class="card">
+                    <div class="card-image">
+                        <figure class="image is-2by3">
+                            <img src="https://ozinoveva.s3-us-west-2.amazonaws.com/etc/portrait.jpg" alt="Portrait">
+                        </figure>
+                    </div>
+                    <div class="card-content">
+                        <div class="media">
+                            <div class="media-content">
+                                <p class="title is-2">Olga Zinoveva</p>
+                                <p class="subtitle is-4">Software engineer, builder, artist.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="aboutMainContent" class="tile is-parent is-vertical">
+            <div class="tile is-child box">
+                <div class="content">
+                    I made my first personal page on the Internet when I was 12. A virtual pet website, Neopets, allowed customizing the CSS on the pet pages, and having a beautiful one was a point of pride for serious players. This was a time when tiled textures and visitor counters were still in vogue, and the marquee tag felt like the magical apex of the Internet. My page was beautiful, but the internet has moved on, so it finally felt like the right time to make a new one.
+                </div>
+            </div>
+            <div class="tile is-child box">
+                <p class="title is-4">AllMyGames</p>
+                <div class="content">
+                    In 2018, I founded a startup. My co-founder and I first worked on Pollaborate, a service for making group decisions easy and fair. When we realized that we would need to pivot to B2B to make money, we pivoted to another product entirely - <a href="http://allmy.games">AllMyGames</a> - a place for gamers discover, share, and organize their game collections. People love AllMyGames - some of our users have collections in the 1000s - but again, monetizing the product proved challenging, so we transitioned AllMyGames to a moonlighting project. It turns out that working on the service is more fun when you do it for your users, not investors!
+                </div>
+            </div>
+            <div class="tile is-child box">
+                <p class="title is-4">Photography</p>
+                <div class="content">
+                    I love all visual art, but photography has a special place in my heart. I got my first DSLR right after college, and I haven't been separated from it for long ever since. Over time, I have upgraded my hardware and the software I use to process photos, but the biggest upgrade by far has been to my skill. I am no expert by any means, but I'm always getting better and looking for a new perspective. I most enjoy capturing the beauty of cities and landscapes, fleeting feelings and transient moments.
+                </div>
+            </div>
+            <div class="tile is-child box">
+                <p class="title is-4">About this site</p>
+                <div class="content">
+                    I built this site with <a href="https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor">Blazor WebAssembly</a>, a beta-stage framework for writing performant web code with C#.
+                    I also used a JS-free UI framework called <a href="https://bulma.io/">Bulma</a> for styling, and Adobe AfterEffects with a template from <a href="https://www.animoplex.com/">Animoplex</a> for the background.
+                    All source code for this site is available on my <a href="https://github.com/SlyCaptainFlint/blazor-simple-site">GitHub</a>.
+                </div>
+            </div>
+        </div>
     </div>
-    <div id="aboutMainContent" class="tile is-parent is-vertical">
-      <div class="tile is-child box">
-        <div class="content">
-          I made my first personal page on the Internet when I was 12. A virtual pet website, Neopets, allowed customizing the CSS on the pet pages, and having a beautiful one was a point of pride for serious players. This was a time when tiled textures and visitor counters were still in vogue, and the marquee tag felt like the magical apex of the Internet. My page was beautiful, but the internet has moved on, so it finally felt like the right time to make a new one.
-        </div>
-      </div>
-      <div class="tile is-child box">
-        <p class="title is-4">AllMyGames</p>
-        <div class="content">
-          In 2018, I founded a startup. My co-founder and I first worked on Pollaborate, a service for making group decisions easy and fair. When we realized that we would need to pivot to B2B to make money, we pivoted to another product entirely - <a href="http://allmy.games">AllMyGames</a> - a place for gamers discover, share, and organize their game collections. People love AllMyGames - some of our users have collections in the 1000s - but again, monetizing the product proved challenging, so we transitioned AllMyGames to a moonlighting project. It turns out that working on the service is more fun when you do it for your users, not investors!
-        </div>
-      </div>
-      <div class="tile is-child box">
-        <p class="title is-4">Photography</p>
-        <div class="content">
-          I love all visual art, but photography has a special place in my heart. I got my first DSLR right after college, and I haven't been separated from it for long ever since. Over time, I have upgraded my hardware and the software I use to process photos, but the biggest upgrade by far has been to my skill. I am no expert by any means, but I'm always getting better and looking for a new perspective. I most enjoy capturing the beauty of cities and landscapes, fleeting feelings and transient moments.
-        </div>
-      </div>
-      <div class="tile is-child box">
-        <p class="title is-4">About this site</p>
-        <div class="content">
-          I built this site with <a href="https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor">Blazor WebAssembly</a>, a beta-stage framework for writing performant web code with C#.
-          I also used a JS-free UI framework called <a href="https://bulma.io/">Bulma</a> for styling, and Adobe AfterEffects with a template from <a href="https://www.animoplex.com/">Animoplex</a> for the background.
-          All source code for this site is available on my <a href="https://github.com/SlyCaptainFlint/blazor-simple-site">GitHub</a>.
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 
 @code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)    {
+        
+        JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop");
+               
+    }
 }

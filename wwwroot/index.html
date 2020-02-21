@@ -48,6 +48,13 @@
 
             videoIntro.play();
         };
+
+        window.playVideoIfNotStarted = async function(videoId) {
+            let video = document.getElementById(videoId);
+            video.classList.remove("hidden");
+            video.muted = "muted";
+            video.play();
+        }
     </script>
 </body>
 
