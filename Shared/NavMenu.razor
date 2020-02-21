@@ -1,11 +1,6 @@
 ﻿<nav class="navbar is-transparent" role="navigation" aria-label="main navigation">
-    <a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="navbar" @onclick="ToggleNavMenu">
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-    </a>
 
-  <div id="navbar" class="navbar-menu-custom  @NavMenuCssClass">
+  <div id="navbar" class="navbar-menu-custom">
     <div class="navbar-start">
         <NavLink class="navbar-item" href="" Match="NavLinkMatch.All">
             Main
@@ -23,12 +18,4 @@
 </nav>
 
 @code {
-    private bool collapseNavMenu = true;
-
-    private string NavMenuCssClass => collapseNavMenu ?  null : "is-active";
-
-    private void ToggleNavMenu()
-    {
-        collapseNavMenu = !collapseNavMenu;
-    }
 }
