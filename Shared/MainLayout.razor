@@ -1,7 +1,9 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 
-<video id="backgroundVideoLoop" class="background-video" loop>
+<div id="fallbackBackground"></div>
+
+<video id="backgroundVideoLoop" class="background-video hidden" loop>
     <source type="video/mp4"
           src="loop.mp4">
 </video>
@@ -15,7 +17,6 @@
 <div id="MainBodyContainer" class="container is-fluid">    
     @Body
 </div>
-
 
 @code {
 

@@ -13,7 +13,9 @@
 
 <body>
     <app>
-        <div class="ui-loader">
+        <div id="fallbackBackground">
+            <div class="ui-loader"></div>
+        </div>        
     </app>
 
     <div id="blazor-error-ui"class="notification is-warning">
@@ -37,8 +39,10 @@
             let videoLooping = document.getElementById(videoLoopingId);
             videoIntro.muted = "muted";
             videoLooping.muted = "muted";
+
             videoIntro.addEventListener('ended', (event) => {
                 videoIntro.classList.add("hidden");
+                videoLooping.classList.remove("hidden");
                 videoLooping.play();
             });
 

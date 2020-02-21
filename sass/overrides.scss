@@ -6,6 +6,12 @@ $dark: $dark-background;
 $background: $dark-background;
 $text: $white-text;
 $modal-content-width: 1000px;
+$card-background-color: transparent;
+$box-background-color: transparent;
+$box-color: $white-text;
+$card-color: $white-text;
+$title-color: $white-text;
+$subtitle-color: $white-text;
 
 @import "../node_modules/bulma/bulma.sass";
 @import "loader.scss";
@@ -101,8 +107,9 @@ $modal-content-width: 1000px;
 }
 
 body {
-    background: rgb(35,21,64);
-    background: linear-gradient(0deg, rgba(35,21,64,1) 0%, rgba(28,2,64,1) 100%);
+    background: transparent;
+    // background: rgb(35,21,64);
+    // background: linear-gradient(0deg, rgba(35,21,64,1) 0%, rgba(28,2,64,1) 100%);
     width: 100%;
     min-height: 100vh;
     font-family: 'Raleway', sans-serif;
@@ -113,7 +120,7 @@ body {
 
     font-family: 'Overpass', sans-serif;
 
-    font-family: 'Cairo', sans-serif;
+    
 
     font-family: 'Rajdhani', sans-serif;    
 
@@ -126,11 +133,13 @@ body {
     font-family: 'Poiret One', cursive;
 }
 
+#aboutMainContent {
+    font-family: 'Cairo', sans-serif;
+}
+
 html{
     height: 100%;
 }
-
-
 
 #backgroundOverlay {
     background-color: rgba(0, 0, 0, 0.7);
@@ -151,6 +160,17 @@ html{
     }
 }
 
+#fallbackBackground {
+    z-index: -10;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    min-width: 100%;
+    min-height: 100%;
+    background: rgb(35,21,64);
+    background: linear-gradient(0deg, rgba(35,21,64,1) 0%, rgba(28,2,64,1) 100%);
+}
+
 #blazor-error-ui {   
     bottom: 0;
     display: none;
@@ -168,9 +188,13 @@ html{
     min-width: 100%;
     min-height: 100%;
     object-fit: cover;
+    z-index: -1;
 
     &#backgroundVideoIntro {
-        z-index: 15;
+
+        &.hidden {
+            z-index: -15;
+        }
     }
 
     &.hidden {
