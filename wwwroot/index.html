@@ -46,14 +46,18 @@
                 videoLooping.play();
             });
 
-            videoIntro.play();
+            videoIntro.addEventListener('canplaythrough', (event) => {
+                videoIntro.play();
+            });            
         };
 
         window.playVideoIfNotStarted = async function(videoId) {
             let video = document.getElementById(videoId);
             video.classList.remove("hidden");
             video.muted = "muted";
-            video.play();
+            video.addEventListener('canplaythrough', (event) => {
+                video.play();
+            });            
         }
     </script>
 </body>
