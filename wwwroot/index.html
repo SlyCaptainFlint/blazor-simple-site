@@ -48,10 +48,9 @@
                 });
             });
 
-            videoIntro.play();
-            // videoIntro.addEventListener('canplaythrough', (event) => {
-                
-            // });            
+            videoIntro.addEventListener('canplaythrough', (event) => {
+                videoIntro.play();
+            });            
         };
 
         window.playVideoIfNotStarted = async function(videoId) {
