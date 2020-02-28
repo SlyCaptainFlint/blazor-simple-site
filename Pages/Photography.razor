@@ -22,11 +22,11 @@ else
 }
 
 <div id="photoShowcase" class="modal @ModalCssClass">
-    <div class="modal-background" @onclick="CloseModal"></div>
-    <div class="modal-content is-clipped">
+    <div class="modal-background" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault></div>
+    <div class="modal-content is-clipped" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault>
         <img class="@ShowcasePhotoCssClass" src=@ShowcasePhotoUrl alt="" @onload=ShowShowcasePhoto>
     </div>
-    <button class="modal-close is-large" aria-label="close" @onclick="CloseModal"></button>
+    <button class="modal-close is-large" aria-label="close" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault></button>
 </div>
 
 @code {
