@@ -42,13 +42,16 @@
 
             videoIntro.addEventListener('ended', (event) => {
                 videoIntro.classList.add("hidden");
-                videoLooping.classList.remove("hidden");
-                videoLooping.play();
+                videoLooping.addEventListener('canplaythrough', (event) => {
+                    videoLooping.classList.remove("hidden");
+                    videoLooping.play();
+                });
             });
 
-            videoIntro.addEventListener('canplaythrough', (event) => {
-                videoIntro.play();
-            });            
+            videoIntro.play();
+            // videoIntro.addEventListener('canplaythrough', (event) => {
+                
+            // });            
         };
 
         window.playVideoIfNotStarted = async function(videoId) {
