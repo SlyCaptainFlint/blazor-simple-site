@@ -12,6 +12,9 @@
 </head>
 
 <body>
+    <link rel="preload" as="video" href="intro.mp4">
+    <link rel="preload" as="video" href="loop.mp4">
+
     <app>
         <div id="fallbackBackground">
             <div class="ui-loader"></div>
@@ -37,26 +40,42 @@
         window.playBackgroundVideos = async function(videoIntroId, videoLoopingId) {
             let videoIntro = document.getElementById(videoIntroId);
             let videoLooping = document.getElementById(videoLoopingId);
-            videoIntro.muted = "muted";
-            videoLooping.muted = "muted";
+            videoIntro.src = 'intro.mp4';
+            videoLooping.src = 'loop.mp4'
+            videoIntro.muted = 'muted';
+            videoLooping.muted = 'muted';
+
+            let loopLoaded = false
+            let introComplete = false;
 
             videoIntro.addEventListener('ended', (event) => {
-                videoIntro.classList.add("hidden");
-                videoLooping.addEventListener('canplaythrough', (event) => {
-                    videoLooping.classList.remove("hidden");
+                videoIntro.classList.add('hidden');
+                introComplete = true;
+
+                if(loopLoaded){
+                    videoLooping.classList.remove('hidden');
                     videoLooping.play();
-                });
+                }
             });
 
             videoIntro.addEventListener('canplaythrough', (event) => {
                 videoIntro.play();
-            });            
+            }); 
+
+            videoLooping.addEventListener('canplaythrough', (event) => {
+                loopLoaded = true;
+
+                if(introComplete){
+                    videoLooping.classList.remove('hidden');
+                    videoLooping.play();
+                }
+            });        
         };
 
         window.playVideoIfNotStarted = async function(videoId) {
             let video = document.getElementById(videoId);
-            video.classList.remove("hidden");
-            video.muted = "muted";
+            video.classList.remove('hidden');
+            video.muted = 'muted';
             video.addEventListener('canplaythrough', (event) => {
                 video.play();
             });            
