@@ -32,18 +32,20 @@
             display: none;
         }
     
-        &:hover {
-            transform: scale(1.2);
-            filter: none;
-            transition:transform 0.3s, filter 0.3s;
-            z-index:10;            
-        }
+        @media (hover: hover) {
+            &:hover {
+                transform: scale(1.2);
+                filter: none;
+                transition:transform 0.3s, filter 0.3s;
+                z-index:10;            
+            }
+        }       
     }
 }
 
 #photoShowcase {
     .modal-content {
-        height: 95vh;
+        // height: 95vh;
         display: flex;
         justify-content: space-around;
         align-items: center;

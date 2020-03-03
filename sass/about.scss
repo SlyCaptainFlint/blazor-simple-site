@@ -2,6 +2,15 @@
     font-family: 'Cairo', sans-serif;
 }
 
+#portrait {
+    opacity: 1;
+    transition: opacity 0.5s;
+
+    &.hidden {
+        opacity: 0;
+    }
+}
+
 #aboutPageContainer {
     animation: aboutPageFade 2s; 
 }

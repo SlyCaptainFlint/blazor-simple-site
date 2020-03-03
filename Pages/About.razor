@@ -8,7 +8,7 @@
                 <div class="card">
                     <div class="card-image">
                         <figure class="image is-2by3">
-                            <img src="https://ozinoveva.s3-us-west-2.amazonaws.com/etc/portrait.jpg" alt="Portrait">
+                            <img id="portrait" class="@PortraitCssClass" src="https://ozinoveva.s3-us-west-2.amazonaws.com/etc/portrait.jpg" alt="Portrait" @onload="ShowPortrait">
                         </figure>
                     </div>
                     <div class="card-content">
@@ -54,9 +54,15 @@
 
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)    {
-        
-        JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop");
-               
+    private bool portraitHidden = true;
+    public string PortraitCssClass => portraitHidden ? "hidden" : "";
+
+    public void ShowPortrait()
+    {
+        portraitHidden = false;
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)    
+    {  
+        JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop");               
     }
 }

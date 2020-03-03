@@ -4,14 +4,21 @@ $loader-thickness: 0.3rem;
 .loader-container {
     height: 100vh;
     width: 100vw;
+    opacity: 0;
+    animation: loader-appear 0.2s;
+    animation-delay: 0.8s;
+
+    &.hidden {
+        display: none;
+    }
 }
 
 .ui-loader {
     width: $loader-size;
     height: $loader-size;
     position: absolute;
-    top: 50%;    
-    left: 50%;    
+    top: 50%;
+    left: 50%;
     margin: 0;    
     text-align: center;    
     z-index: 1000;
@@ -59,5 +66,15 @@ $loader-thickness: 0.3rem;
     100% {    
         -webkit-transform: rotate(360deg);
         transform: rotate(360deg);
+    }
+}
+
+@keyframes loader-appear {
+    0% {
+        opacity: 0;
+    
+    }
+    100% {    
+        opacity: 1;
     }
 }

@@ -21,10 +21,13 @@ else
     </div>   
 }
 
-<div id="photoShowcase" class="modal @ModalCssClass">
+<div id="photoShowcase" class="modal @ModalCssClass" @ontouchend:preventDefault @ontouchmove:preventDefault>
     <div class="modal-background" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault></div>
-    <div class="modal-content is-clipped" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault>
-        <img class="@ShowcasePhotoCssClass" src=@ShowcasePhotoUrl alt="" @onload=ShowShowcasePhoto>
+    <div class="modal-content is-clipped" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault>
+        <img class="@ShowcasePhotoCssClass" src=@ShowcasePhotoUrl alt="" @onload=ShowShowcasePhoto @onclick:stopPropagation @ontouchend:stopPropagation>
+        <div class="loader-container @ShowcaseLoaderCssClass">
+            <div class="ui-loader"></div>
+        </div>
     </div>
     <button class="modal-close is-large" aria-label="close" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault></button>
 </div>
@@ -33,7 +36,8 @@ else
     private bool showModal = false;
     private string ModalCssClass => showModal ? "is-active" : null;
     private bool hideShowcasePhoto = true;
-    private string ShowcasePhotoCssClass => hideShowcasePhoto ? "hidden": "";    
+    private string ShowcasePhotoCssClass => hideShowcasePhoto ? "hidden": "";
+    private string ShowcaseLoaderCssClass => hideShowcasePhoto ? "" : "hidden";
     private List<Photo> Photos = new List<Photo>();
     private float PhotoWidth { get; set; } = 0;
     private string ShowcasePhotoUrl { get; set; }
@@ -45,6 +49,8 @@ else
         showModal = false;
         ShowcasePhotoUrl = "";
         hideShowcasePhoto = true;
+
+        JSRuntime.InvokeVoidAsync("turnOnBodyScrolling"); 
     }
 
     // Unhides showcase photo once it is loaded (this avoids partially loaded content from displaying)
@@ -58,6 +64,8 @@ else
         var selectedPhoto = Photos.Find(x => x.Id == id);
         ShowcasePhotoUrl = selectedPhoto.Url_l;
         showModal = true;
+
+        JSRuntime.InvokeVoidAsync("turnOffBodyScrolling"); 
     }
 
     // Unhides a photo in the gallery once it is loaded (this avoids partially loaded content from displaying)

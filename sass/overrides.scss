@@ -5,7 +5,7 @@ $white-text: hsl(0, 0%, 96%);
 $dark: $dark-background;
 $background: $dark-background;
 $text: $white-text;
-$modal-content-width: 1000px;
+$modal-content-width: 100%;
 $card-background-color: transparent;
 $box-background-color: transparent;
 $box-color: $white-text;
@@ -23,7 +23,7 @@ $subtitle-color: $white-text;
 body {
     background: transparent;
     width: 100%;
-    min-height: 100vh;
+    min-height: 100%;
     font-family: 'Raleway', sans-serif;
 
     font-family: 'Quicksand', sans-serif;
@@ -44,7 +44,7 @@ body {
 }
 
 html{
-    height: 100%;
+    max-height: 100%;
 }
 
 #backgroundOverlay {
