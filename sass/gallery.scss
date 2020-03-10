@@ -30,15 +30,27 @@
         
         &.collapsed {
             display: none;
-        }
-    
-        @media (hover: hover) {
-            &:hover {
-                transform: scale(1.2);
-                filter: none;
-                transition:transform 0.3s, filter 0.3s;
-                z-index:10;            
-            }
+        }    
+        
+        &:hover {
+            transform: scale(1.2);
+            filter: none;
+            transition:transform 0.3s, filter 0.3s;
+            z-index:10;         
+            
+        }       
+    }
+}
+
+// Apply override for styles on touch devices, so we don't get the hover effects
+// on gallery images.
+.touch-styles {
+    .clipped-border {  
+        filter: none;
+        transform: none;  
+        
+        &:hover {
+             transform: none;
         }       
     }
 }

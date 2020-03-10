@@ -1,20 +1,26 @@
 ﻿@page "/"
 @inject IJSRuntime JSRuntime;
+@inject MainContainerSizeProvider SizeProvider
 
 
 
 
-<video id="backgroundVideoIntro" class="background-video" preload="auto">
-    <source type="video/mp4"
-          src="intro.mp4">
+<video id="backgroundVideoIntro" class="background-video" preload="auto" playsinline>
 </video>
+
+<div id="startButtonContainer" class="hidden">
+    <button class="button is-large is-outlined">Start</button>
+</div>
+
 
 @code {
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if(firstRender)
         {
-            JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop");
+            var dimensions = await SizeProvider.GetDimensions();
+            var videoFullSize = dimensions.Width > 660;
+            JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop", videoFullSize);
         }        
     }
 }

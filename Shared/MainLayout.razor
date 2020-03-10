@@ -1,16 +1,16 @@
 ﻿@inherits LayoutComponentBase
 @inject NavigationManager NavigationManager
 
-<div id="fallbackBackground"></div>
+<div class="default-background">
+    <div id="fallbackBackground" class="hidden"></div>
+</div>
 
-<video id="backgroundVideoLoop" class="background-video hidden" loop>
-    <source type="video/mp4"
-          src="loop.mp4">
+<video id="backgroundVideoLoop" class="background-video hidden" loop playsinline disablepictureinpicture>
 </video>
 
 <div id="backgroundOverlay" class="@OverlayCssClass"></div>
 
-<div id="navContainer" class="nav-container @NavContainerCssClass">
+<div id="navContainer" class="nav-container @NavContainerPositionCssClass @NavContainerHiddenCssClass">
     <NavMenu />
 </div>
 
@@ -23,7 +23,27 @@
     // Determine if we are on the main page so we can style certain parts of the layout differently.
     private bool isMainPage => NavigationManager.Uri == NavigationManager.BaseUri;
 
-    private string NavContainerCssClass => isMainPage ? "centered": "";
+    private string NavContainerPositionCssClass => isMainPage ? "centered": "";
+
+    private string NavContainerHiddenCssClass => NavigationHidden ? "hidden": "";
 
     private string OverlayCssClass => isMainPage ? "hidden": "";
+
+    private static bool NavigationHidden = true;
+    
+    private static event EventHandler ShowNavigationMenuEvent;
+
+    protected override void OnInitialized() 
+    {
+        ShowNavigationMenuEvent += (x, y) => {
+            NavigationHidden = false;
+            this.StateHasChanged();
+        };
+    }
+
+    [JSInvokable]
+    public static void ShowNavigationMenu()
+    {
+        ShowNavigationMenuEvent.Invoke(null, null);
+    }
 }

@@ -12,11 +12,10 @@
 </head>
 
 <body>
-    <link rel="preload" as="video" href="intro.mp4">
-    <link rel="preload" as="video" href="loop.mp4">
+
 
     <app>
-        <div id="fallbackBackground">
+        <div class="default-background">
             <div class="ui-loader"></div>
         </div>        
     </app>
@@ -28,6 +27,39 @@
     
     <script src="_framework/blazor.webassembly.js"></script>
     <script type="text/javascript">
+    
+        let preloadVideo = function(videoPath) {
+            return new Promise((resolve, reject) => {
+                let req = new XMLHttpRequest();
+                req.open('GET', videoPath, true);
+                req.responseType = 'blob';
+
+                req.onload = function() {
+                    // Onload is triggered even on 404
+                    // so we need to check the status code
+                    if (this.status === 200) {
+                        let videoBlob = this.response;
+                        let vid = URL.createObjectURL(videoBlob); 
+                        
+                        resolve(vid);
+                    }
+                }
+
+                req.onerror = function() {
+                    console.log("error loading video");
+                    reject();
+                }
+
+                req.send();
+            });
+        }
+
+        // Detect first touch and assume that the user will primarily use touch on the site.
+        // This will allow customizing styles in the gallery accordingly.
+        document.addEventListener('touchstart', (event) => {
+            document.body.classList.add('touch-styles');
+        });
+
         window.turnOnBodyScrolling = function() {
             const scrollY = document.body.style.top;
             document.body.style.position = '';
@@ -42,46 +74,162 @@
         
         window.getMainContainerDimensions = function() {
             let element = document.getElementById("MainBodyContainer");
-            console.log(element);
             return {
-                    width: element.clientWidth,
-                    height: element.clientHeight
+                width: element.clientWidth,
+                height: element.clientHeight
             };
         };
 
-        window.playBackgroundVideos = async function(videoIntroId, videoLoopingId) {
-            let videoIntro = document.getElementById(videoIntroId);
-            let videoLooping = document.getElementById(videoLoopingId);
-            videoIntro.src = 'intro.mp4';
-            videoLooping.src = 'loop.mp4'
-            videoIntro.muted = 'muted';
-            videoLooping.muted = 'muted';
+        window.playBackgroundVideos = async function(videoIntroId, videoLoopingId, fullSize = true) {
+            let preloadIntroPromise;
+            let preloadLoopPromise;
 
-            let loopLoaded = false
-            let introComplete = false;
+            if(fullSize){
+                preloadIntroPromise = preloadVideo('intro.mp4');
+                preloadLoopPromise = preloadVideo('loop.mp4');
+            }
+            else{
+                preloadIntroPromise = preloadVideo('intro_mobile.mp4');
+                preloadLoopPromise = preloadVideo('loop_mobile.mp4');
+            }
 
-            videoIntro.addEventListener('ended', (event) => {
-                videoIntro.classList.add('hidden');
-                introComplete = true;
+            let playVideos = async () => {
+                let videoIntro = document.getElementById(videoIntroId);
+                let videoLooping = document.getElementById(videoLoopingId);
 
-                if(loopLoaded){
-                    videoLooping.classList.remove('hidden');
-                    videoLooping.play();
-                }
-            });
 
-            videoIntro.addEventListener('canplaythrough', (event) => {
-                videoIntro.play();
-            }); 
 
-            videoLooping.addEventListener('canplaythrough', (event) => {
-                loopLoaded = true;
+                // videoIntro.addEventListener('ended', async (event) => {
+                //     videoIntro.classList.add('hidden');
 
-                if(introComplete){
-                    videoLooping.classList.remove('hidden');
-                    videoLooping.play();
-                }
-            });        
+                //     let loadedLoop = await preloadLoopPromise;                    
+                //     videoLooping.src = loadedLoop;
+                //     videoLooping.muted = 'muted';
+                //     videoLooping.classList.remove('hidden');
+
+                //     try{
+                //         await videoLooping.play();
+                //     }                    
+                //     catch {
+                //         let fallbackBackground = document.getElementById('fallbackBackground');
+                //         fallbackBackground.classList.remove('hidden');
+                //     }
+                // });
+
+                videoIntro.addEventListener('ended', async (event) => {
+                    videoIntro.classList.add('hidden');
+                });
+                videoIntro.addEventListener('error', async (event) => {
+                    videoIntro.classList.add('hidden');
+                });
+
+                let loadedIntro = await preloadIntroPromise;
+                videoIntro.src = loadedIntro;
+                videoIntro.muted = 'muted';
+                let introVideoPlayPromise =  videoIntro.play();
+
+                let loadedLoop = await preloadLoopPromise;                    
+                videoLooping.src = loadedLoop;
+                videoLooping.muted = 'muted';
+                videoLooping.classList.remove('hidden');
+
+                let loopVideoPlayPromise = videoLooping.play();
+                await Promise.all([introVideoPlayPromise, loopVideoPlayPromise]);
+            };
+
+            //let navigation = document.getElementById('navContainer');
+
+            try {
+                await playVideos();
+                //navigation.classList.remove('hidden');
+                await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
+            }
+            catch (err) {
+                let startButton = document.getElementById('startButtonContainer');
+                startButton.classList.remove('hidden');
+                console.log(err);
+
+                document.addEventListener('touchend', async (event) => {
+                    event.preventDefault();
+                    startButton.classList.add('hidden');
+                    //navigation.classList.remove('hidden');
+                    await DotNet.invokeMethodAsync('BlazorApplication', 'ShowNavigationMenu');
+                    try {
+                        await playVideos();
+                    }
+                    catch {
+                        let fallbackBackground = document.getElementById('fallbackBackground');
+                        fallbackBackground.classList.remove('hidden');
+                    }
+                }, {once : true});
+            }
+
+            // document.addEventListener('touchstart', async (event) => {
+            //     let videoIntro = document.getElementById(videoIntroId);
+            //     let videoLooping = document.getElementById(videoLoopingId);
+         
+                
+                // let loopLoaded = false
+                // let introComplete = false;
+
+                
+                // videoIntro.addEventListener('ended', async (event) => {
+                //     alert("attempting to play looping video");
+                //     videoIntro.classList.add('hidden');
+                //     //introComplete = true;
+
+                //     await preloadLoopPromise;
+                //     videoLooping.muted = 'muted';
+                //     videoLooping.classList.remove('hidden');
+
+                
+                //     try{
+                //         await videoLooping.play();
+                //         // alert("played successfully");
+                //     }
+                //     catch(err){
+                //         alert(err);
+                //     }
+
+                    // if(loopLoaded){
+                    //     videoLooping.muted = 'muted';
+                    //     videoLooping.classList.remove('hidden');
+                    //     videoLooping.play();
+                    // }
+                // });
+       
+
+                // await preloadIntroPromise;
+                // videoIntro.muted = 'muted';
+                // alert("attempting to play video now");
+
+                // try{
+                //     await videoIntro.play();
+                //     alert("played successfully");
+                // }
+                // catch(err){
+                //     alert(err);
+                // }
+
+            // });
+
+
+
+            // videoIntro.addEventListener('canplaythrough', (event) => {
+            //     alert("video attempt");
+            //     videoIntro.muted = 'muted';
+            //     videoIntro.play();
+            // }); 
+
+            // videoLooping.addEventListener('canplaythrough', (event) => {
+            //     loopLoaded = true;
+
+            //     if(introComplete){
+            //         videoLooping.muted = 'muted';
+            //         videoLooping.classList.remove('hidden');
+            //         videoLooping.play();
+            //     }
+            // });        
         };
 
         window.playVideoIfNotStarted = async function(videoId) {

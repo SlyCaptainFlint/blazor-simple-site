@@ -47,6 +47,30 @@ html{
     max-height: 100%;
 }
 
+#startButtonContainer{
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 60;
+
+    &.hidden {
+        display: none;
+    }
+
+    button.button.is-outlined{
+        background-color: transparent;
+        color: $white-text;
+        font-family: 'Raleway', sans-serif;
+        font-size: 1.5rem;
+        z-index: 60;
+    }
+}
+
 #backgroundOverlay {
     background-color: rgba(0, 0, 0, 0.65);
     height: 100vh;
@@ -66,7 +90,7 @@ html{
     }
 }
 
-#fallbackBackground {
+.default-background {
     z-index: -10;
     position: fixed;
     right: 0;
@@ -75,6 +99,20 @@ html{
     min-height: 100%;
     background: rgb(35,21,64);
     background: linear-gradient(0deg, rgba(35,21,64,1) 0%, rgba(28,2,64,1) 100%);
+    display: flex;
+
+    #fallbackBackground {
+        width: 100%;
+        background-image: url("../background.jpg");
+        opacity: 0.7;
+        background-size: cover;
+        transition: opacity 2s;
+
+        &.hidden{
+            opacity: 0;
+            transition: opacity 2s;
+        }
+    }
 }
 
 #blazor-error-ui {   
