@@ -97,25 +97,6 @@
                 let videoIntro = document.getElementById(videoIntroId);
                 let videoLooping = document.getElementById(videoLoopingId);
 
-
-
-                // videoIntro.addEventListener('ended', async (event) => {
-                //     videoIntro.classList.add('hidden');
-
-                //     let loadedLoop = await preloadLoopPromise;                    
-                //     videoLooping.src = loadedLoop;
-                //     videoLooping.muted = 'muted';
-                //     videoLooping.classList.remove('hidden');
-
-                //     try{
-                //         await videoLooping.play();
-                //     }                    
-                //     catch {
-                //         let fallbackBackground = document.getElementById('fallbackBackground');
-                //         fallbackBackground.classList.remove('hidden');
-                //     }
-                // });
-
                 videoIntro.addEventListener('ended', async (event) => {
                     videoIntro.classList.add('hidden');
                 });
@@ -137,23 +118,18 @@
                 await Promise.all([introVideoPlayPromise, loopVideoPlayPromise]);
             };
 
-            //let navigation = document.getElementById('navContainer');
-
             try {
                 await playVideos();
-                //navigation.classList.remove('hidden');
                 await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
             }
-            catch (err) {
+            catch {
                 let startButton = document.getElementById('startButtonContainer');
                 startButton.classList.remove('hidden');
-                console.log(err);
 
                 document.addEventListener('touchend', async (event) => {
                     event.preventDefault();
                     startButton.classList.add('hidden');
-                    //navigation.classList.remove('hidden');
-                    await DotNet.invokeMethodAsync('BlazorApplication', 'ShowNavigationMenu');
+                    await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
                     try {
                         await playVideos();
                     }
@@ -163,73 +139,6 @@
                     }
                 }, {once : true});
             }
-
-            // document.addEventListener('touchstart', async (event) => {
-            //     let videoIntro = document.getElementById(videoIntroId);
-            //     let videoLooping = document.getElementById(videoLoopingId);
-         
-                
-                // let loopLoaded = false
-                // let introComplete = false;
-
-                
-                // videoIntro.addEventListener('ended', async (event) => {
-                //     alert("attempting to play looping video");
-                //     videoIntro.classList.add('hidden');
-                //     //introComplete = true;
-
-                //     await preloadLoopPromise;
-                //     videoLooping.muted = 'muted';
-                //     videoLooping.classList.remove('hidden');
-
-                
-                //     try{
-                //         await videoLooping.play();
-                //         // alert("played successfully");
-                //     }
-                //     catch(err){
-                //         alert(err);
-                //     }
-
-                    // if(loopLoaded){
-                    //     videoLooping.muted = 'muted';
-                    //     videoLooping.classList.remove('hidden');
-                    //     videoLooping.play();
-                    // }
-                // });
-       
-
-                // await preloadIntroPromise;
-                // videoIntro.muted = 'muted';
-                // alert("attempting to play video now");
-
-                // try{
-                //     await videoIntro.play();
-                //     alert("played successfully");
-                // }
-                // catch(err){
-                //     alert(err);
-                // }
-
-            // });
-
-
-
-            // videoIntro.addEventListener('canplaythrough', (event) => {
-            //     alert("video attempt");
-            //     videoIntro.muted = 'muted';
-            //     videoIntro.play();
-            // }); 
-
-            // videoLooping.addEventListener('canplaythrough', (event) => {
-            //     loopLoaded = true;
-
-            //     if(introComplete){
-            //         videoLooping.muted = 'muted';
-            //         videoLooping.classList.remove('hidden');
-            //         videoLooping.play();
-            //     }
-            // });        
         };
 
         window.playVideoIfNotStarted = async function(videoId) {
