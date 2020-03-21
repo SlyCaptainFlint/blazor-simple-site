@@ -20,7 +20,7 @@
         {
             var dimensions = await SizeProvider.GetDimensions();
             var videoFullSize = dimensions.Width > 660;
-            JSRuntime.InvokeVoidAsync("playBackgroundVideos", "backgroundVideoIntro", "backgroundVideoLoop", videoFullSize);
+            JSRuntime.InvokeVoidAsync("playBackgroundVideos", videoFullSize);
         }        
     }
 }

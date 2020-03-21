@@ -1,5 +1,6 @@
 ﻿@page "/about"
 @inject IJSRuntime JSRuntime;
+@inject MainContainerSizeProvider SizeProvider
 
 <div id="aboutPageContainer" class="container">
     <div class="tile is-ancestor">
@@ -63,6 +64,11 @@
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)    
     {  
-        JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop");               
+        if(firstRender)
+        {
+            var dimensions = await SizeProvider.GetDimensions();
+            var videoFullSize = dimensions.Width > 660;
+            JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", videoFullSize);   
+        }            
     }
 }

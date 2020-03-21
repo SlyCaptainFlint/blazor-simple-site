@@ -107,8 +107,11 @@ else
             var dimensions = await SizeProvider.GetDimensions();
             var containerWidth = dimensions.Width;        
             int photosInRow = containerWidth/minWidth;
-            PhotoWidth = containerWidth/photosInRow; 
-            JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", "backgroundVideoLoop"); 
+            PhotoWidth = containerWidth/photosInRow;
+
+            var videoFullSize = dimensions.Width > 660;
+            JSRuntime.InvokeVoidAsync("playVideoIfNotStarted", videoFullSize);   
+             
         }
     }
 }

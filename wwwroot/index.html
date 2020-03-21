@@ -27,32 +27,89 @@
     
     <script src="_framework/blazor.webassembly.js"></script>
     <script type="text/javascript">
-    
-        let preloadVideo = function(videoPath) {
-            return new Promise((resolve, reject) => {
-                let req = new XMLHttpRequest();
-                req.open('GET', videoPath, true);
-                req.responseType = 'blob';
 
-                req.onload = function() {
-                    // Onload is triggered even on 404
-                    // so we need to check the status code
-                    if (this.status === 200) {
-                        let videoBlob = this.response;
-                        let vid = URL.createObjectURL(videoBlob); 
-                        
-                        resolve(vid);
+        class VideoPlayer {
+            constructor(fullSize = true){
+                this.preloadVideos(fullSize);
+            }
+
+            preloadVideo (videoPath) {
+                return new Promise((resolve, reject) => {
+                    let req = new XMLHttpRequest();
+                    req.open('GET', videoPath, true);
+                    req.responseType = 'blob';
+
+                    req.onload = function() {
+                        // Onload is triggered even on 404
+                        // so we need to check the status code
+                        if (this.status === 200) {
+                            let videoBlob = this.response;
+                            let vid = URL.createObjectURL(videoBlob); 
+                            
+                            resolve(vid);
+                        }
                     }
-                }
 
-                req.onerror = function() {
-                    console.log("error loading video");
-                    reject();
-                }
+                    req.onerror = function() {
+                        console.log("error loading video");
+                        reject();
+                    }
 
-                req.send();
-            });
+                    req.send();
+                });
+            }
+
+            preloadVideos(fullSize) {
+                if(fullSize){
+                    this.preloadIntroPromise = this.preloadVideo('intro.mp4');
+                    this.preloadLoopPromise = this.preloadVideo('loop.mp4');
+                }
+                else{
+                    this.preloadIntroPromise = this.preloadVideo('intro_mobile.mp4');
+                    this.preloadLoopPromise = this.preloadVideo('loop_mobile.mp4');
+                }
+            }
+
+            async playVideos() {
+                let videoIntro = document.getElementById("backgroundVideoIntro");
+                let videoLooping = document.getElementById("backgroundVideoLoop");
+
+                videoIntro.addEventListener('ended', async (event) => {
+                    videoIntro.classList.add('hidden');
+                });
+                videoIntro.addEventListener('error', async (event) => {
+                    videoIntro.classList.add('hidden');
+                });
+
+                let loadedIntro = await this.preloadIntroPromise;
+                videoIntro.src = loadedIntro;
+                videoIntro.muted = 'muted';
+                let introVideoPlayPromise =  videoIntro.play();
+
+                let loadedLoop = await this.preloadLoopPromise;                    
+                videoLooping.src = loadedLoop;
+                videoLooping.muted = 'muted';
+                videoLooping.classList.remove('hidden');
+
+                let loopVideoPlayPromise = videoLooping.play();
+                await Promise.all([introVideoPlayPromise, loopVideoPlayPromise]);
+            };
+
+            async playOnlyBackgroundVideo(){
+                let videoLooping = document.getElementById("backgroundVideoLoop");
+                videoLooping.addEventListener('error', async (event) => {
+                    videoLooping.classList.add('hidden');
+                });
+
+                let loadedLoop = await this.preloadLoopPromise;                    
+                videoLooping.src = loadedLoop;
+                videoLooping.muted = 'muted';
+                videoLooping.classList.remove('hidden');
+
+                await videoLooping.play();
+            }
         }
+
 
         // Detect first touch and assume that the user will primarily use touch on the site.
         // This will allow customizing styles in the gallery accordingly.
@@ -80,60 +137,33 @@
             };
         };
 
-        window.playBackgroundVideos = async function(videoIntroId, videoLoopingId, fullSize = true) {
-            let preloadIntroPromise;
-            let preloadLoopPromise;
-
-            if(fullSize){
-                preloadIntroPromise = preloadVideo('intro.mp4');
-                preloadLoopPromise = preloadVideo('loop.mp4');
+        window.playBackgroundVideos = async function(fullSize = true) {
+            // Create video manager if one does not yet exist
+            if(window.videoPlayer === undefined){
+                window.videoPlayer = new VideoPlayer(fullSize);
             }
-            else{
-                preloadIntroPromise = preloadVideo('intro_mobile.mp4');
-                preloadLoopPromise = preloadVideo('loop_mobile.mp4');
-            }
-
-            let playVideos = async () => {
-                let videoIntro = document.getElementById(videoIntroId);
-                let videoLooping = document.getElementById(videoLoopingId);
-
-                videoIntro.addEventListener('ended', async (event) => {
-                    videoIntro.classList.add('hidden');
-                });
-                videoIntro.addEventListener('error', async (event) => {
-                    videoIntro.classList.add('hidden');
-                });
-
-                let loadedIntro = await preloadIntroPromise;
-                videoIntro.src = loadedIntro;
-                videoIntro.muted = 'muted';
-                let introVideoPlayPromise =  videoIntro.play();
-
-                let loadedLoop = await preloadLoopPromise;                    
-                videoLooping.src = loadedLoop;
-                videoLooping.muted = 'muted';
-                videoLooping.classList.remove('hidden');
-
-                let loopVideoPlayPromise = videoLooping.play();
-                await Promise.all([introVideoPlayPromise, loopVideoPlayPromise]);
-            };
 
             try {
-                await playVideos();
+                // If we are able to play both the videos on the first try, show the navigation menu
+                await window.videoPlayer.playVideos();
                 await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
             }
             catch {
+                // If we cannot play both the videos on the first try, it is likely the browser needs the user
+                // to interact with it first. Show a start button
                 let startButton = document.getElementById('startButtonContainer');
                 startButton.classList.remove('hidden');
 
+                // Once the start button is clicked, we attempt to play videos again
                 document.addEventListener('touchend', async (event) => {
                     event.preventDefault();
                     startButton.classList.add('hidden');
                     await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
                     try {
-                        await playVideos();
+                        await window.videoPlayer.playVideos();
                     }
                     catch {
+                        // If the video playing failed this time, give up and show a static background instead
                         let fallbackBackground = document.getElementById('fallbackBackground');
                         fallbackBackground.classList.remove('hidden');
                     }
@@ -141,13 +171,23 @@
             }
         };
 
-        window.playVideoIfNotStarted = async function(videoId) {
-            let video = document.getElementById(videoId);
-            video.classList.remove('hidden');
-            video.muted = 'muted';
-            video.addEventListener('canplaythrough', (event) => {
-                video.play();
-            });            
+        window.playVideoIfNotStarted = async function(fullSize = true) {
+            // Un-hide navigation menu 
+            await DotNet.invokeMethodAsync('PersonalSite', 'ShowNavigationMenu');
+
+            // Create video manager if one does not yet exist
+            if(window.videoPlayer === undefined){
+                window.videoPlayer = new VideoPlayer(fullSize);
+            }   
+
+            // Attempt to play video sequence, and fall back to static background in case of error
+            try {
+                await window.videoPlayer.playOnlyBackgroundVideo();
+            }
+            catch {
+                let fallbackBackground = document.getElementById('fallbackBackground');
+                fallbackBackground.classList.remove('hidden');
+            }
         }
     </script>
 </body>
