@@ -89,6 +89,10 @@
                 let loadedLoop = await this.preloadLoopPromise;                    
                 videoLooping.src = loadedLoop;
                 videoLooping.muted = 'muted';
+
+                // Wait a bit to allow the first video to start playing to the background video doesn't pop up in front
+                // of it for a split second
+                await new Promise(r => setTimeout(r, 300));
                 videoLooping.classList.remove('hidden');
 
                 let loopVideoPlayPromise = videoLooping.play();
