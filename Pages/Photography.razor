@@ -15,13 +15,19 @@ else
         @foreach(var photo in Photos)
         {
             <div class="clipped-border @photo.ImageCollapsedClass" style="width: @(PhotoWidth)px; height: @(PhotoWidth)px" @onclick="@(()=>SelectPhoto(@photo.Id))">
-                <img class="@photo.ImageHiddenClass" src=@photo.Url_m @onload="@(()=>ShowPhoto(@photo.Id))" @onerror="@(()=>CollapsePhoto(@photo.Id))"/>
+                <img class="@photo.ImageHiddenClass" src=@photo.Url_m @onload="@(()=>ShowPhoto(@photo.Id))" @onerror="@(()=>RemovePhoto(@photo.Id))"/>
             </div>
         }
     </div>   
 }
 
 <div id="photoShowcase" class="modal @ModalCssClass" @ontouchend:preventDefault @ontouchmove:preventDefault>
+    <button class="gallery-navigate next" @onclick="ShowNextPhoto" title="next" @ontouchend:preventDefault @ontouchmove:preventDefault>
+        <i class="fas fa-chevron-right"></i>
+    </button>
+    <button class="gallery-navigate previous" @onclick="ShowPreviousPhoto" title="next" @ontouchend:preventDefault @ontouchmove:preventDefault>
+        <i class="fas fa-chevron-left"></i>
+    </button>
     <div class="modal-background" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault></div>
     <div class="modal-content is-clipped" @onclick="CloseModal" @ontouchend="CloseModal" @ontouchend:preventDefault @ontouchmove:preventDefault>
         <img class="@ShowcasePhotoCssClass" src=@ShowcasePhotoUrl alt="" @onload=ShowShowcasePhoto @onclick:stopPropagation @ontouchend:stopPropagation>
@@ -40,14 +46,39 @@ else
     private string ShowcaseLoaderCssClass => hideShowcasePhoto ? "" : "hidden";
     private List<Photo> Photos = new List<Photo>();
     private float PhotoWidth { get; set; } = 0;
-    private string ShowcasePhotoUrl { get; set; }
+    private string ShowcasePhotoUrl { 
+        get
+        {
+            var selectedPhoto = Photos.Find(x => x.Id == currentlySelectedPhotoId);
+            return selectedPhoto?.Url_l ?? "";
+        } 
+    }
+    private int currentlySelectedPhotoId { get; set; } = -1;
     private string PreviewPhotoBaseUrl { get; set; } = "https://ozinoveva.s3-us-west-2.amazonaws.com/medium/";    
     private string ShowcasePhotoBaseUrl { get; set; } = "https://ozinoveva.s3-us-west-2.amazonaws.com/large/";
+
+    private void ShowNextPhoto()
+    {
+        if (currentlySelectedPhotoId != -1)
+        {
+            currentlySelectedPhotoId =  (currentlySelectedPhotoId + 1) % Photos.Count;
+        }
+    }
+
+    private void ShowPreviousPhoto()
+    {
+        if(currentlySelectedPhotoId != -1)
+        {
+            // In this case, we need special handling for negative numbers, which don't yield a correct result for modular division
+            var remainder = (currentlySelectedPhotoId - 1) % Photos.Count; 
+            currentlySelectedPhotoId = remainder < 0 ? remainder + Photos.Count : remainder;
+        }
+    }
 
     private void CloseModal()
     {
         showModal = false;
-        ShowcasePhotoUrl = "";
+        currentlySelectedPhotoId = -1;
         hideShowcasePhoto = true;
 
         JSRuntime.InvokeVoidAsync("turnOnBodyScrolling"); 
@@ -61,8 +92,7 @@ else
 
     private void SelectPhoto(int id)
     {
-        var selectedPhoto = Photos.Find(x => x.Id == id);
-        ShowcasePhotoUrl = selectedPhoto.Url_l;
+        currentlySelectedPhotoId = id;
         showModal = true;
 
         JSRuntime.InvokeVoidAsync("turnOffBodyScrolling"); 
@@ -76,10 +106,11 @@ else
     }
 
     // Hides containers for any photos that may not exist
-    private void CollapsePhoto(int id)
+    private void RemovePhoto(int id)
     {
         var selectedPhoto = Photos.Find(x => x.Id == id);
-        selectedPhoto.ImageCollapsed = true;
+        Photos.Remove(Photos.Find(x => x.Id == id));
+        //selectedPhoto.ImageCollapsed = true;
     }
 
     protected override void OnInitialized()

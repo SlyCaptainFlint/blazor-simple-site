@@ -73,4 +73,46 @@
             }
         }
     }
+
+    .gallery-navigate {
+        position: absolute;        
+        font-size: 3rem;
+        z-index: 15;
+        background: transparent;
+        color:white;
+        border: none;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+
+        @media(max-width: 500px){
+            font-size: 2rem;
+            background: black;
+        }
+
+        @media(max-width: 350px){
+            font-size: 1.7rem;
+            background: black;
+        }
+
+        &:hover {
+            opacity: 0.85;
+            transition: opacity 0.2s;
+        }
+
+        &.next {
+            right: 0.5rem;
+
+            @media(max-width: 500px){
+                right: 0.1rem;
+            }
+        }
+
+        &.previous {
+            left: 0.5rem;
+
+            @media(max-width: 500px){
+                left: 0.1rem;
+            }
+        }
+    }
 }
