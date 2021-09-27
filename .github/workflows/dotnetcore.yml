@@ -21,7 +21,7 @@ jobs:
     - name: Set up .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.100
+        dotnet-version: 5.x
     - name: Build with dotnet
       run: dotnet publish -c Release
     - name: Upload to S3
@@ -33,7 +33,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-west-1'   
-        SOURCE_DIR: 'bin/Release/netstandard2.1/publish/PersonalSite/dist'
+        SOURCE_DIR: 'bin/Release/net5.0/publish'
     - name: Upload WASM file to S3
       uses: jakejarvis/s3-sync-action@master
       with:
@@ -43,5 +43,5 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-west-1'   
-        SOURCE_DIR: 'bin/Release/netstandard2.1/publish/PersonalSite/dist'
+        SOURCE_DIR: 'bin/Release/net5.0/publish'
       
