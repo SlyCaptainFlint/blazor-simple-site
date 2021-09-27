@@ -6,7 +6,7 @@
   "license": "unlicensed",
   "devDependencies": {
     "bulma": "^0.7.2",
-    "node-sass": "^4.13.1"
+    "node-sass": "^4.14.1"
   },
   "scripts": {
     "css-build": "node-sass --omit-source-map-url sass/overrides.scss wwwroot/css/site.css",
