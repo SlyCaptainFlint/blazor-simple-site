@@ -5,11 +5,11 @@
   "main": "sass/mystyles.scss",
   "license": "unlicensed",
   "devDependencies": {
-    "bulma": "^0.7.2",
-    "node-sass": "^4.14.1"
+    "bulma": "0.9.3",
+    "sass": "^1.41.0"
   },
   "scripts": {
-    "css-build": "node-sass --omit-source-map-url sass/overrides.scss wwwroot/css/site.css",
+    "css-build": "sass sass/overrides.scss wwwroot/css/site.css",
     "css-watch": "npm run css-build -- --watch",
     "start": "npm run css-watch"
   }
