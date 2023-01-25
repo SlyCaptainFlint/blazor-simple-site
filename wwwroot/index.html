@@ -143,9 +143,10 @@
         
         window.getMainContainerDimensions = function() {
             let element = document.getElementById("MainBodyContainer");
+            let computedStyle = getComputedStyle(element);
             return {
-                width: element.clientWidth,
-                height: element.clientHeight
+                width: element.clientWidth - (parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight)),
+                height: element.clientHeight - (parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom))
             };
         };
 
