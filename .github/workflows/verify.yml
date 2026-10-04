@@ -1,4 +1,4 @@
-name: Verify migration
+name: CI checks
 on:
   push:
     branches: [master, 'feat/**']

@@ -47,7 +47,20 @@ Without a local `FLICKR_API_KEY` secret, this serves the site and returns a safe
 
 The root `wrangler.jsonc` is the future combined deployment configuration: the same `ozinoveva-photos` Worker serves the API, with Vite's `dist/` as static assets. Assets are served first; `assets.run_worker_first` is **only** `["/api/*"]`. Other routes receive the SPA fallback. Do not use global Worker-first or an asset cache override on API paths. The existing backend-only configuration remains available in `backend/photos-worker`.
 
-After review, approval, and verification of the existing encrypted secret, an authorized operator can deploy the reviewed build with the **root** config. This overwrites the live Worker's code/assets, so it is deliberately not an automatic script or workflow. A separate DNS/domain cutover decision is still needed for the real site. Preserve the previous Worker version and S3 deployment for rollback. Do not retire Lambda/S3 until the cutover is verified. Do not activate any paid plan as an implicit migration step.
+After review, approval, and verification of the existing encrypted secret, use the manual **production publish** workflow described below. It deploys with the **root** config and overwrites the live Worker's code/assets. A separate DNS/domain cutover decision is still needed for the real site. Preserve the previous Worker version and S3 deployment for rollback. Do not retire Lambda/S3 until the cutover is verified. Do not activate any paid plan as an implicit migration step.
+
+### Manual production publish
+
+`CI checks` (`.github/workflows/verify.yml`) validates pushes and pull requests without deployment credentials. `production publish` (`.github/workflows/production-publish.yml`) runs only through **Actions → production publish → Run workflow**, after the workflow is merged into the default branch. Select `master`. Both the original initiator and any rerun initiator must be `SlyCaptainFlint`; other branches, accounts, and forks skip the publish job. The workflow checks out the exact selected commit, reruns all checks and a deployment dry-run, then publishes the combined Worker and static assets. Pushes and merges do not trigger publishing.
+
+Before the first publish, configure **Settings → Environments → production** (these settings are not created by this YAML):
+
+1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off so the owner can approve their own manual run. Disable administrator bypass of protection rules.
+2. Restrict deployment branches to the selected branch `master`, with no allowed tags.
+3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a Cloudflare token with Workers deployment permissions scoped to the intended account. Keep these credentials out of repository/organization secrets so other jobs cannot access them without environment approval.
+4. Verify that the existing Worker has its encrypted `FLICKR_API_KEY`; do not copy it into GitHub or frontend configuration. This workflow does not set or rotate it.
+
+Public visitors cannot manually dispatch this repository's workflows; GitHub requires write access. The actor guard is an additional check, not a substitute for environment protection: someone who can edit workflows could remove it. Keep repository administration trusted and protect `master` and workflow changes if granting others write access. No GitHub environment rules or secrets are configured by this change, and the publish workflow has not been run.
 
 See [backend setup, safety and diagnostics](backend/photos-worker/README.md) for the photo contract, current source selection, cache privacy window, resizing and secure secret configuration.
 
