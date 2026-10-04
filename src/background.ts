@@ -128,6 +128,9 @@ export function startBackground(): void {
     cancelAnimationFrame(frame);
     frame = 0;
     previous = 0;
+    // Publish the current active time even between throttled paints, so a
+    // paused resize renders precisely the same frozen instant.
+    paint();
     const running = !paused && !document.hidden;
     svg.dataset.running = String(running);
     toggle.textContent = paused ? 'Play animation' : 'Pause animation';
