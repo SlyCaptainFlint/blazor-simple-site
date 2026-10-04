@@ -12,7 +12,7 @@ export async function loadPhotos(signal: AbortSignal): Promise<Photo[]> {
     throw new Error('The photo service returned an unexpected response. Please try again.');
   }
   const api = new URL(PHOTOS_API, location.origin);
-  return payload.photos.slice(0, 30).map((value: unknown) => {
+  return payload.photos.slice(0, 50).map((value: unknown) => {
     if (!value || typeof value !== 'object') throw new Error('Invalid photo');
     const p = value as Record<string, unknown>;
     if (typeof p.id !== 'string' || !/^\d+$/.test(p.id) || typeof p.title !== 'string' ||

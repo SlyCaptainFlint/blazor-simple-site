@@ -1,9 +1,9 @@
 import {test,expect,type Page} from '@playwright/test';
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=','base64');
-const photos=Array.from({length:30},(_,i)=>({id:String(1000+i),title:`Photograph ${i+1}`,width:2048,height:1365,
+const photos=Array.from({length:50},(_,i)=>({id:String(1000+i),title:`Photograph ${i+1}`,width:2048,height:1365,
   variants:[320,640,960,1440,1920].map(width=>({width,url:`/api/photos/${1000+i}/${width}.jpg`}))}));
 async function fixture(page:Page){
-  await page.route('**/api/photos',route=>route.fulfill({json:{limit:30,photos}}));
+  await page.route('**/api/photos',route=>route.fulfill({json:{limit:50,photos}}));
   await page.route(/\/api\/photos\/\d+\/\d+\.jpg$/,route=>route.fulfill({body:image,contentType:'image/png'}));
 }
 test.beforeEach(async({page})=>{await fixture(page);});
@@ -14,7 +14,7 @@ test('direct routes have titles, navigation state, and no horizontal overflow',a
     await expect(page.locator('h1')).toHaveCount(1);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
-  await expect(page.locator('.photo-open')).toHaveCount(30);
+  await expect(page.locator('.photo-open')).toHaveCount(50);
 });
 test('navigation/back/forward preserves the same playing background node and request sources',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
@@ -39,7 +39,7 @@ test('accessible lightbox wraps with arrows, traps focus, closes with Escape and
   await page.goto('/photography');const first=page.locator('.photo-open').first();await first.click();
   const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
   await expect(page.getByRole('button',{name:'Close photograph',exact:true})).toBeFocused();
-  await page.keyboard.press('ArrowLeft');await expect(dialog).toHaveAccessibleName('Photograph 30');
+  await page.keyboard.press('ArrowLeft');await expect(dialog).toHaveAccessibleName('Photograph 50');
   await page.keyboard.press('ArrowRight');await expect(dialog).toHaveAccessibleName('Photograph 1');
   await page.keyboard.press('ArrowRight');await expect(page.getByRole('dialog')).toHaveAccessibleName('Photograph 2');
   for(let i=0;i<8;i++)await page.keyboard.press('Tab');
@@ -48,7 +48,7 @@ test('accessible lightbox wraps with arrows, traps focus, closes with Escape and
   expect(await page.locator('body').evaluate(el=>el.style.overflow)).toBe('');
 });
 test('phone resize, failed image and repeated gallery navigation remain usable',async({page})=>{
-  await page.setViewportSize({width:320,height:700});await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(30);
+  await page.setViewportSize({width:320,height:700});await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(50);
   const width=await page.locator('.photo-open').first().evaluate(el=>el.getBoundingClientRect().width);expect(width).toBeGreaterThan(100);
   await page.setViewportSize({width:1200,height:800});await expect.poll(()=>page.locator('.photo-open').first().evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(width);
   await page.route(/\/api\/photos\/1000\/\d+\.jpg$/,route=>route.fulfill({status:502}));
@@ -77,18 +77,18 @@ test('leaving a pending gallery cancels its work and leaves no stale dialog',asy
   await expect(page).toHaveTitle('About · Olga Zinoveva');await expect(page.locator('.gallery')).toHaveCount(0);await expect(page.locator('dialog')).toHaveCount(0);
 });
 test('history restores gallery scroll and route changes clean up an open modal',async({page})=>{
-  await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(30);
+  await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(50);
   await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>history.state.site.scroll)).toBe(500);
   await page.evaluate(()=>document.querySelector<HTMLAnchorElement>('nav a[href="/about"]')!.click());
   await expect(page).toHaveTitle('About · Olga Zinoveva');expect(await page.evaluate(()=>scrollY)).toBe(0);
-  await page.goBack();await expect(page.locator('.photo-open')).toHaveCount(30);await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(500);
+  await page.goBack();await expect(page.locator('.photo-open')).toHaveCount(50);await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(500);
   await page.locator('.photo-open').first().click();await expect(page.getByRole('dialog')).toBeVisible();
   await page.goForward();await expect(page).toHaveTitle('About · Olga Zinoveva');await expect(page.locator('dialog')).toHaveCount(0);
   expect(await page.locator('body').evaluate(el=>el.style.overflow)).toBe('');
 });
 
 test('photos have no corner links and lightbox shows only image and navigation controls',async({page})=>{
-  await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(30);
+  await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(50);
   await expect(page.locator('.gallery a, .photo-source, .gallery-credit')).toHaveCount(0);
   await page.locator('.photo-open').first().click();const dialog=page.getByRole('dialog');
   await expect(dialog).toHaveAccessibleName('Photograph 1');

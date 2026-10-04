@@ -4,9 +4,9 @@ A Cloudflare Worker that serves a public Flickr photo gallery and resized images
 
 ## Functionality
 
-The Worker requests the 30 newest public photos from Flickr account `93665003@N05`, ordered by upload date. It omits duplicate photos, entries from other accounts, and photos without a usable image source. The response may therefore contain fewer than 30 photos.
+The Worker requests the 50 newest public photos from Flickr account `93665003@N05`, ordered by upload date. It omits duplicate photos, entries from other accounts, and photos without a usable image source. The response may therefore contain fewer than 50 photos.
 
-Gallery metadata is cached internally for up to 60 seconds. Concurrent cache misses in the same Worker instance share a Flickr request. Each image request checks that the photo belongs to the current gallery. Expired metadata is not served when Flickr is unavailable.
+Gallery metadata is cached internally for up to one hour. Concurrent cache misses in the same Worker instance share a Flickr request. Each image request checks that the photo belongs to the current gallery. Expired metadata is not served when Flickr is unavailable.
 
 Images use the largest available Flickr source and Cloudflare image transformations. Resizing preserves the aspect ratio, never upscales, uses quality 82, and removes metadata. Only validated Flickr image URLs are accepted; clients cannot supply source URLs.
 
@@ -21,7 +21,7 @@ Returns a JSON object with:
 | Field | Description |
 | --- | --- |
 | `fetchedAt` | ISO timestamp of the Flickr metadata fetch. |
-| `limit` | Maximum number of photos: `30`. |
+| `limit` | Maximum number of photos: `50`. |
 | `photos` | Photos in newest-upload-first order; an empty gallery returns `[]`. |
 
 Each photo contains `id`, `title`, `pageUrl` (its Flickr page), `width`, `height`, `sources`, and `variants`. Dimensions describe the largest available source. Each source has `url`, `width`, and `height`; each variant has an absolute `url` and its output `width`, capped at the source width. Variants can be used in an image `srcset`; deduplicate equal output widths for small sources.
@@ -56,7 +56,7 @@ Errors return JSON with an `error` string.
 
 `ALLOWED_ORIGIN` enables CORS for one matching browser origin; it does not authenticate requests. The API is publicly readable.
 
-The Flickr account, image presets, and metadata cache duration are defined by `USER_ID`, `WIDTHS`, and `TTL` in `src/index.ts`.
+The Flickr account, photo limit, image presets, and metadata cache duration are defined by `USER_ID`, `LIMIT`, `WIDTHS`, and `TTL` in `src/index.ts`.
 
 ## Run locally
 

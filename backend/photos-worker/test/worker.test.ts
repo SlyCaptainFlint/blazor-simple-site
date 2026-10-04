@@ -26,7 +26,7 @@ function setup() {
   const handler = createHandler({fetch: fetcher as any, cache: cache as any, now: () => now});
   const get = (path = '/api/photos', env: any = {FLICKR_API_KEY: 'private-key'}, init?: RequestInit) =>
     handler(new Request(`https://photos.example${path}`, init) as any, env);
-  return {get, calls, advance: () => {now += 61000;}, set: (p: unknown) => {upstream = p;},
+  return {get, calls, entries, advance: (milliseconds = 3600000) => {now += milliseconds;}, set: (p: unknown) => {upstream = p;},
     fail: () => {fail = true;}, imageType: (t: string) => {imageType = t;}, redirect: () => {redirect = true;}};
 }
 test('missing secret fails closed without upstream requests', async () => {
@@ -36,14 +36,14 @@ test('missing secret fails closed without upstream requests', async () => {
 test('preserves account/newest-public search and returns stable IDs, source dimensions and fixed variants', async () => {
   const s = setup(); const r = await s.get(); const body: any = await r.json();
   const q = new URL(s.calls[0].url).searchParams;
-  for (const [key,value] of Object.entries({method:'flickr.photos.search', user_id:owner, sort:'date-posted-desc', privacy_filter:'1', per_page:'30', page:'1', media:'photos'})) assert.equal(q.get(key),value);
-  assert.equal(q.has('tags'), false); assert.equal(body.photos[0].id,'123'); assert.equal(body.photos[0].width,1600);
+  for (const [key,value] of Object.entries({method:'flickr.photos.search', user_id:owner, sort:'date-posted-desc', privacy_filter:'1', per_page:'50', page:'1', media:'photos'})) assert.equal(q.get(key),value);
+  assert.equal(body.limit, 50); assert.equal(q.has('tags'), false); assert.equal(body.photos[0].id,'123'); assert.equal(body.photos[0].width,1600);
   assert.deepEqual(body.photos[0].variants.map((v:any)=>v.width),[320,640,960,1440,1600]);
   assert.equal(body.photos[0].variants[0].url,'https://photos.example/api/photos/123/320.jpg');
   assert.equal(JSON.stringify(body).includes('private-key'),false); assert.equal(r.headers.get('Cache-Control'),'no-store');
 });
-test('caps gallery at 30, excludes private/wrong owner/duplicate/unsafe photos', () => {
-  assert.equal(normalize(payload(Array.from({length:35},(_,i)=>photo(String(i)))),0).photos.length,30);
+test('caps gallery at 50, excludes private/wrong owner/duplicate/unsafe photos', () => {
+  assert.equal(normalize(payload(Array.from({length:55},(_,i)=>photo(String(i)))),0).photos.length,50);
   assert.equal(normalize(payload([photo(),photo(),{...photo('124'),ispublic:0},{...photo('125'),owner:'other'},
     {...photo('126'),url_l:'https://evil.example/a.jpg',url_h:'https://evil.example/a.jpg'}]),0).photos.length,1);
 });
@@ -55,7 +55,7 @@ test('rejects arbitrary hosts, credentials, ports, redirects and mismatched phot
 });
 test('validates method/path/preset/query before fetching', async () => {
   const s = setup();
-  for (const [path,status] of [['/api/photos?url=https://evil.test',400],['/api/photos/123/321.jpg',404],['/api/photos/999/640.jpg?width=2',400],['/__internal/gallery-v1',404]]) assert.equal((await s.get(String(path))).status,status);
+  for (const [path,status] of [['/api/photos?url=https://evil.test',400],['/api/photos/123/321.jpg',404],['/api/photos/999/640.jpg?width=2',400],['/__internal/gallery-v2',404]]) assert.equal((await s.get(String(path))).status,status);
   assert.equal((await s.get('/api/photos',undefined,{method:'POST'})).status,405);
   assert.equal(s.calls.length,0);
 });
@@ -69,9 +69,13 @@ test('resizes largest permitted source with fixed options and no user headers', 
 test('unknown IDs cannot fetch images even on allowed Flickr host', async () => {
   const s=setup(); assert.equal((await s.get('/api/photos/999/640.jpg')).status,404); assert.equal(s.calls.length,1);
 });
-test('cache expires and removed/private photos stop resolving', async () => {
-  const s=setup(); await s.get(); await s.get(); assert.equal(s.calls.length,1);
-  s.advance(); s.set(payload([])); assert.equal((await s.get('/api/photos/123/640.jpg')).status,404); assert.equal(s.calls.length,2);
+test('gallery cache lasts one hour and removed photos stop resolving at expiry', async () => {
+  const s=setup(); await s.get();
+  assert.equal(s.entries.values().next().value?.headers.get('Cache-Control'), 'public, max-age=3600');
+  s.set(payload([])); s.advance(3599999);
+  const cached: any = await (await s.get()).json();
+  assert.equal(cached.photos[0].id, '123'); assert.equal(s.calls.length,1);
+  s.advance(1); assert.equal((await s.get('/api/photos/123/640.jpg')).status,404); assert.equal(s.calls.length,2);
 });
 test('expired cache fails closed instead of serving stale photos, with sanitized error', async () => {
   const s=setup(); await s.get(); s.advance(); s.fail(); const r=await s.get('/api/photos/123/640.jpg');

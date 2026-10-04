@@ -5,7 +5,8 @@ export interface Env {
 }
 const USER_ID = '93665003@N05';
 const WIDTHS = [320, 640, 960, 1440, 1920] as const;
-const TTL = 60;
+const LIMIT = 50;
+const TTL = 60 * 60;
 interface Source { url: string; width: number; height: number }
 interface Photo {
   id: string;
@@ -82,7 +83,7 @@ export function normalize(payload: unknown, now: number): Gallery {
   if (!Array.isArray(list)) throw new ServiceError(502, 'invalid_flickr_response');
   const photos: Photo[] = [];
   const seen = new Set<string>();
-  for (const item of list.slice(0, 30)) {
+  for (const item of list.slice(0, LIMIT)) {
     const p = record(item);
     if (typeof p.id !== 'string' || !/^\d+$/.test(p.id) || seen.has(p.id) ||
         p.owner !== USER_ID || Number(p.ispublic) !== 1) continue;
@@ -106,7 +107,7 @@ export function createHandler(deps: Dependencies) {
   // Coalesce a cold gallery fetch within each isolate. Key rotation never reuses an old in-flight request.
   let pending: { key: string; task: Promise<Gallery> } | undefined;
   async function gallery(request: Request, key: string): Promise<Gallery> {
-    const cacheKey = new Request(new URL('/__internal/gallery-v1', request.url));
+    const cacheKey = new Request(new URL('/__internal/gallery-v2', request.url));
     try {
       const hit = await deps.cache.match(cacheKey);
       if (hit) {
@@ -120,7 +121,7 @@ export function createHandler(deps: Dependencies) {
       const url = new URL('https://www.flickr.com/services/rest/');
       url.search = new URLSearchParams({api_key: key, method: 'flickr.photos.search',
         user_id: USER_ID, privacy_filter: '1', media: 'photos', sort: 'date-posted-desc',
-        per_page: '30', page: '1', format: 'json', nojsoncallback: '1',
+        per_page: String(LIMIT), page: '1', format: 'json', nojsoncallback: '1',
         extras: 'url_s,url_m,url_l,url_k,url_h'}).toString();
       let response: Response;
       const signal = AbortSignal.timeout(10000);
@@ -176,7 +177,7 @@ export function createHandler(deps: Dependencies) {
       const key = env.FLICKR_API_KEY?.trim();
       if (!key) return json({error: 'service_not_configured'}, 503);
       const data = await gallery(request, key);
-      if (!image) return json({fetchedAt: data.fetchedAt, limit: 30, photos: data.photos.map(p => ({...p,
+      if (!image) return json({fetchedAt: data.fetchedAt, limit: LIMIT, photos: data.photos.map(p => ({...p,
         variants: WIDTHS.map(width => ({width: Math.min(width, p.width),
           url: `${url.origin}/api/photos/${p.id}/${width}.jpg`}))
       }))});
