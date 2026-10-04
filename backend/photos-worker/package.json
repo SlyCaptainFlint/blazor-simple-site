@@ -1,0 +1,23 @@
+{
+  "name": "ozinoveva-photos-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "build": "esbuild src/index.ts --bundle --format=esm --target=es2022 --outfile=dist/worker.js",
+    "check": "npm run typecheck && npm test && npm run build",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "^24",
+    "esbuild": "^0.25",
+    "miniflare": "^5.20261001.0-alpha",
+    "tsx": "^4",
+    "typescript": "^5.9",
+    "wrangler": "^4"
+  }
+}

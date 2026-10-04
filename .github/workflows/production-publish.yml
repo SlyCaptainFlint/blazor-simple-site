@@ -1,0 +1,58 @@
+name: production publish
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Check both the original initiator and the person requesting a rerun.
+    if: >-
+      github.repository == 'SlyCaptainFlint/blazor-simple-site' &&
+      github.ref == 'refs/heads/master' &&
+      github.actor == 'SlyCaptainFlint' &&
+      github.triggering_actor == 'SlyCaptainFlint'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Configure approval rules and credentials in GitHub Settings → Environments.
+    environment: production
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/photos-worker/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix backend/photos-worker
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: npm run worker:check
+      - name: Publish Worker and static site
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing production CLOUDFLARE_API_TOKEN'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing production CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+          node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
