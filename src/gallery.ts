@@ -5,7 +5,6 @@ export async function renderGallery(main: HTMLElement, signal: AbortSignal): Pro
     <h1 id="page-title" class="sr-only">Photography</h1>
     <div class="gallery-status" role="status">Loading photographs…</div>
     <div class="gallery"></div>
-    <p class="gallery-credit">Photography by Olga Zinoveva · <a href="https://www.flickr.com/photos/93665003@N05/" target="_blank" rel="noopener noreferrer">View on Flickr ↗</a></p>
   </section>`;
   const status = main.querySelector<HTMLElement>('.gallery-status')!;
   const grid = main.querySelector<HTMLElement>('.gallery')!;
@@ -30,10 +29,7 @@ export async function renderGallery(main: HTMLElement, signal: AbortSignal): Pro
       const fallback = document.createElement('span'); fallback.className = 'photo-fallback'; fallback.textContent = 'Preview unavailable';
       button.append(image, fallback);
       button.addEventListener('click', () => lightbox.open(index, button), {signal});
-      const link = document.createElement('a'); link.className = 'photo-source'; link.href = photo.pageUrl;
-      link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Flickr ↗';
-      link.setAttribute('aria-label', `${photo.title || `Photograph ${index + 1}`} on Flickr`);
-      card.append(button, link); grid.append(card);
+      card.append(button); grid.append(card);
     });
   } catch {
     if (signal.aborted) return;
@@ -44,11 +40,11 @@ export async function renderGallery(main: HTMLElement, signal: AbortSignal): Pro
   }
 }
 function createLightbox(photos: Photo[], signal: AbortSignal): { open: (index: number, trigger: HTMLElement) => void } {
-  const dialog = document.createElement('dialog'); dialog.className = 'lightbox'; dialog.setAttribute('aria-labelledby','lightbox-title');
+  const dialog = document.createElement('dialog'); dialog.className = 'lightbox'; dialog.setAttribute('aria-label','Photograph');
   dialog.innerHTML = `<div class="lightbox-shell">
     <button class="lightbox-close icon-button" type="button" aria-label="Close photograph">×</button>
     <button class="lightbox-prev icon-button" type="button" aria-label="Previous photograph">‹</button>
-    <figure><div class="lightbox-image-wrap"></div><figcaption><span id="lightbox-title"></span><span class="lightbox-count"></span><a class="lightbox-source" target="_blank" rel="noopener noreferrer">View on Flickr ↗</a></figcaption></figure>
+    <div class="lightbox-image-wrap"></div>
     <button class="lightbox-next icon-button" type="button" aria-label="Next photograph">›</button>
     <p class="lightbox-status" role="status"></p>
   </div>`;
@@ -62,14 +58,12 @@ function createLightbox(photos: Photo[], signal: AbortSignal): { open: (index: n
   function show(next: number): void {
     index = (next + photos.length) % photos.length;
     const photo = photos[index];
-    dialog.querySelector('#lightbox-title')!.textContent = photo.title || 'Untitled photograph';
-    dialog.querySelector('.lightbox-count')!.textContent = `${index + 1} / ${photos.length}`;
-    dialog.querySelector<HTMLAnchorElement>('.lightbox-source')!.href = photo.pageUrl;
+    dialog.setAttribute('aria-label', photo.title || 'Untitled photograph');
     status.textContent = 'Loading photograph…';
     const image = document.createElement('img'); image.alt = photo.title || 'Untitled photograph';
     image.width = photo.width; image.height = photo.height;
     image.addEventListener('load', () => { if (wrap.contains(image)) status.textContent = ''; }, {signal});
-    image.addEventListener('error', () => { if (wrap.contains(image)) { status.textContent = 'This photograph could not load. Try the next photograph or view it on Flickr.'; image.hidden = true; } }, {signal});
+    image.addEventListener('error', () => { if (wrap.contains(image)) { status.textContent = 'This photograph could not load. Try the next photograph.'; image.hidden = true; } }, {signal});
     image.sizes = '(max-width: 640px) calc(100vw - 32px), 90vw';
     image.srcset = srcset(photo); image.src = photo.variants.at(-1)!.url;
     wrap.replaceChildren(image);

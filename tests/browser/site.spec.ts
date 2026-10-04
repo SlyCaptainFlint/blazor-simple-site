@@ -39,9 +39,9 @@ test('accessible lightbox wraps with arrows, traps focus, closes with Escape and
   await page.goto('/photography');const first=page.locator('.photo-open').first();await first.click();
   const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();
   await expect(page.getByRole('button',{name:'Close photograph',exact:true})).toBeFocused();
-  await page.keyboard.press('ArrowLeft');await expect(page.locator('.lightbox-count')).toHaveText('30 / 30');
-  await page.keyboard.press('ArrowRight');await expect(page.locator('.lightbox-count')).toHaveText('1 / 30');
-  await page.keyboard.press('ArrowRight');await expect(page.locator('.lightbox-count')).toHaveText('2 / 30');
+  await page.keyboard.press('ArrowLeft');await expect(dialog).toHaveAccessibleName('Photograph 30');
+  await page.keyboard.press('ArrowRight');await expect(dialog).toHaveAccessibleName('Photograph 1');
+  await page.keyboard.press('ArrowRight');await expect(page.getByRole('dialog')).toHaveAccessibleName('Photograph 2');
   for(let i=0;i<8;i++)await page.keyboard.press('Tab');
   expect(await page.evaluate(()=>!!document.activeElement?.closest('dialog'))).toBe(true);
   await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(first).toBeFocused();
@@ -54,7 +54,7 @@ test('phone resize, failed image and repeated gallery navigation remain usable',
   await page.route(/\/api\/photos\/1000\/\d+\.jpg$/,route=>route.fulfill({status:502}));
   await page.reload();await expect(page.locator('.photo-open').first()).toHaveClass(/image-failed/);
   await page.locator('.photo-open').first().click();await expect(page.locator('.lightbox-status')).toContainText('could not load');
-  await page.getByRole('button',{name:'Next photograph',exact:true}).click();await expect(page.locator('.lightbox-count')).toHaveText('2 / 30');
+  await page.getByRole('button',{name:'Next photograph',exact:true}).click();await expect(page.getByRole('dialog')).toHaveAccessibleName('Photograph 2');
   await page.keyboard.press('Escape');
   for(let i=0;i<3;i++){await page.getByRole('link',{name:'About',exact:true}).click();await expect(page.locator('dialog')).toHaveCount(0);await page.getByRole('link',{name:'Photography',exact:true}).click();await expect(page.locator('dialog')).toHaveCount(1);}
 });
@@ -85,4 +85,15 @@ test('history restores gallery scroll and route changes clean up an open modal',
   await page.locator('.photo-open').first().click();await expect(page.getByRole('dialog')).toBeVisible();
   await page.goForward();await expect(page).toHaveTitle('About · Olga Zinoveva');await expect(page.locator('dialog')).toHaveCount(0);
   expect(await page.locator('body').evaluate(el=>el.style.overflow)).toBe('');
+});
+
+test('photos have no corner links and lightbox shows only image and navigation controls',async({page})=>{
+  await page.goto('/photography');await expect(page.locator('.photo-open')).toHaveCount(30);
+  await expect(page.locator('.gallery a, .photo-source, .gallery-credit')).toHaveCount(0);
+  await page.locator('.photo-open').first().click();const dialog=page.getByRole('dialog');
+  await expect(dialog).toHaveAccessibleName('Photograph 1');
+  await expect(dialog.locator('img')).toHaveAttribute('alt','Photograph 1');
+  await expect(dialog.locator('figcaption, a, .lightbox-count, .lightbox-source')).toHaveCount(0);
+  await expect(page.locator('.lightbox-status')).toHaveText('');
+  await expect(dialog).toHaveText('× ‹ ›');
 });

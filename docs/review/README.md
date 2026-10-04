@@ -27,6 +27,8 @@ The purple MP4 design is unchanged. Desktop background playback was paused at a 
 - Preserve the existing visual identity, background colors and home navigation placement.
 - Review local portrait, readable About text, and retained biography content.
 - Review desktop grayscale-to-color hover behavior and phone two-column layout.
-- Test dialog close, next/previous buttons, left/right keys, Escape, focus restoration and Flickr attribution.
+- Test dialog close, next/previous buttons, left/right keys, Escape, focus restoration with no captions, counters or overlaid links.
 - Check the reduced-motion static background and manual pause/play control.
 - Validate against the live Flickr metadata/resizing service on a network that can reach it before any cutover.
+
+Updated after visual review: removed the added per-photo Flickr corner links (UI overlays, not embedded watermarks) and the gallery footer credit, plus all visible lightbox captions, counters and links. Accessible image/dialog names and navigation controls remain.
