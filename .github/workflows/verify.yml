@@ -1,0 +1,39 @@
+name: Verify migration
+on:
+  push:
+    branches: [master, 'feat/**']
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/photos-worker/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix backend/photos-worker
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - name: Validate combined Worker and static assets (never deploy)
+        run: npm run worker:check
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

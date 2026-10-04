@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Olga Zinoveva — software engineer, builder, artist. A personal site and photography collection." />
+    <meta name="theme-color" content="#180829" />
+    <title>Olga Zinoveva</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+  </head>
+  <body data-page="home">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="background" aria-hidden="true">
+      <video id="background-loop" class="background-video" muted loop playsinline preload="none" disablepictureinpicture></video>
+      <video id="background-intro" class="background-video" muted playsinline preload="none" disablepictureinpicture></video>
+      <div class="background-shade"></div>
+    </div>
+    <header class="site-header">
+      <nav aria-label="Main navigation">
+        <a href="/" data-route>Main</a>
+        <a href="/about" data-route>About</a>
+        <a href="/photography" data-route>Photography</a>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <button id="motion-toggle" class="motion-toggle" type="button" aria-label="Pause background animation" hidden>Pause animation</button>
+    <noscript><p class="noscript-message">This site needs JavaScript for navigation and the photo gallery. You can also <a href="https://www.flickr.com/photos/93665003@N05/">view the photography on Flickr</a>.</p></noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

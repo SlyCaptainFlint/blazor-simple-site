@@ -1,16 +1,31 @@
 {
-  "name": "styles-build",
-  "version": "1.0.0",
+  "name": "olga-zinoveva-site",
+  "version": "2.0.0",
   "private": true,
-  "main": "sass/mystyles.scss",
-  "license": "unlicensed",
-  "devDependencies": {
-    "bulma": "0.9.3",
-    "sass": "^1.41.0"
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
   },
   "scripts": {
-    "css-build": "sass sass/overrides.scss wwwroot/css/site.css",
-    "css-watch": "npm run css-build -- --watch",
-    "start": "npm run css-watch"
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit && npm --prefix backend/photos-worker run typecheck",
+    "test": "npm --prefix backend/photos-worker test",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build && npm run test:assets && npm run test:browser",
+    "worker:check": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc --dry-run --outdir dist-worker",
+    "worker:dev": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --ip 127.0.0.1 --port 8787",
+    "test:assets": "node --test tests/static-routing.test.mjs"
+  },
+  "dependencies": {
+    "@fontsource/poiret-one": "^5.2.7",
+    "@fontsource/cairo": "^5.2.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^24",
+    "typescript": "^5.9",
+    "vite": "^7"
   }
 }
