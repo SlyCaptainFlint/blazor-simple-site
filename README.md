@@ -1,73 +1,102 @@
 # Olga Zinoveva — personal site
 
-A vanilla TypeScript + Vite site with three client routes (`/`, `/about`, `/photography`) and a Flickr photo API on Cloudflare Workers. No frontend framework or .NET runtime is required.
+A personal website built with TypeScript and Vite, served by Cloudflare Workers. It includes Home (`/`), About (`/about`), and Photography (`/photography`) pages. The photography gallery shows up to 50 recent public Flickr photos with responsive images and a keyboard-accessible lightbox.
 
-The shell owns the existing purple-hexagon MP4 intro/background and navigation. Routing only replaces `<main>`, so the playing background survives repeated navigation and browser back/forward. The videos and fallback artwork are unchanged; a programmatic animation redesign is a separate decision. Fonts and portrait are served locally.
+The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts, the portrait, and background assets are served locally.
 
-## Local development
+## Requirements and setup
 
-Requires Node 24 (or a Vite-compatible Node >=22.12).
+Use Node.js 24. Install frontend and Worker dependencies from the repository root:
 
 ```sh
 npm ci
 npm ci --prefix backend/photos-worker
+```
+
+## Run locally
+
+```sh
 npm run dev
 ```
 
-Vite's development proxy forwards `/api` read-only to the existing `ozinoveva-photos.ozinoveva.workers.dev` service. No Flickr credentials are used by the frontend. A network that cannot reach that host will show the gallery error/retry state. Never place a Flickr key in `VITE_*`, HTML, or checked-in files.
+Open the local URL printed by Vite. Requests to `/api` are proxied to `https://ozinoveva-photos.ozinoveva.workers.dev`. The gallery requires access to that service; the frontend does not need a Flickr key.
 
-## Editing the frontend
-
-Page and component markup lives in `src/templates/*.html`. The persistent navigation and background shell live in `index.html`. TypeScript modules in `src/` handle routing, data, and interactions; `src/style.css` contains the styles.
-
-Vite imports the HTML templates as strings through `?raw` imports. Dynamic photo titles and attributes are assigned through DOM properties in TypeScript.
-
-Run `npm run format` to format frontend TypeScript, HTML, and CSS. `npm run format:check` checks formatting without changing files and is included in CI validation.
-
-## Validation
-
-```sh
-npm run typecheck
-npm test
-npm run build
-npx playwright install chromium
-npm run test:assets
-npm run test:browser
-npm run worker:check
-```
-
-`npm run check` runs type checking, backend tests, production build, combined Worker routing tests and desktop/mobile browser tests. Tests use deterministic photo fixtures, without API credentials or production mutations. For an installed system Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium`.
-
-The Worker-routing test verifies SPA direct navigation and that `/api/unknown` is JSON 404 even with navigation headers. Browser tests cover responsive layout down to 320px, history/scroll restoration, the same playing video node across routes, lightbox focus/keyboard behavior, reduced motion, errors/retry and cleanup during pending requests.
-
-For a local combined Worker/static-assets preview:
+To run the frontend and Worker together locally:
 
 ```sh
 npm run build
 npm run worker:dev
 ```
 
-Without a local `FLICKR_API_KEY` secret, this serves the site and returns a safe 503 for metadata. Fixtures in browser tests do not change the production application. `VITE_PHOTOS_API_URL` optionally selects a public endpoint for isolated review builds; the combined production build should omit it and use `/api/photos`.
+Open `http://127.0.0.1:8787`. For local Flickr access, create an ignored `.dev.vars` file in the repository root containing:
 
-## Deployment safety and cutover
+```dotenv
+FLICKR_API_KEY=your_flickr_api_key
+```
 
-**This migration is review-only until separately approved. Nothing in CI deploys.** The former `master` push → S3 workflow is removed in this branch because it would publish the wrong build after merging. Branch/PR pushes and merging this PR cannot deploy the migrated site. The currently deployed S3 objects, live photo Worker, Lambda, and DNS are untouched. No workflow has been globally disabled outside the PR.
+Without this secret, the local site loads but the photo API returns `503`. Actual image transformations require Cloudflare's deployed service. See the [Worker README](backend/photos-worker/README.md) for backend-only development, API details, and diagnostics.
 
-The root `wrangler.jsonc` is the future combined deployment configuration: the same `ozinoveva-photos` Worker serves the API, with Vite's `dist/` as static assets. Assets are served first; `assets.run_worker_first` is **only** `["/api/*"]`. Other routes receive the SPA fallback. Do not use global Worker-first or an asset cache override on API paths. The existing backend-only configuration remains available in `backend/photos-worker`.
+`VITE_PHOTOS_API_URL` optionally sets a different photo API endpoint when starting Vite or building the site. Leave it unset for the combined deployment, which uses `/api/photos`. Never put secrets in `VITE_*` variables or frontend files.
 
-After review, approval, and verification of the existing encrypted secret, use the manual **production publish** workflow described below. It deploys with the **root** config and overwrites the live Worker's code/assets. A separate DNS/domain cutover decision is still needed for the real site. Preserve the previous Worker version and S3 deployment for rollback. Do not retire Lambda/S3 until the cutover is verified. Do not activate any paid plan as an implicit migration step.
+## Source layout
+
+| Path | Contents |
+| --- | --- |
+| `index.html` | Persistent navigation, background, and page container. |
+| `src/templates/` | Page and component HTML. |
+| `src/main.ts` | Routing, page titles, navigation, and scroll restoration. |
+| `src/about.ts` | About page rendering. |
+| `src/gallery.ts` | Gallery rendering and lightbox interactions. |
+| `src/photos.ts` | Photo API loading and response validation. |
+| `src/background.ts` | Background playback and motion controls. |
+| `src/style.css` | Site styles. |
+| `public/` | Static assets copied into the build. |
+| `backend/photos-worker/` | Flickr API and image transformation Worker. |
+| `tests/` | Browser and combined Worker/static-assets routing tests. |
+
+Vite imports HTML templates through `?raw` imports. TypeScript assigns dynamic photo text and attributes through DOM properties.
+
+Run `npm run format` to format frontend sources and the Worker entry point. `npm run format:check` checks formatting without changing files.
+
+## Test and build
+
+Install Chromium for browser tests, then run the full check suite:
+
+```sh
+npx playwright install --with-deps chromium
+npm run check
+```
+
+`check` runs formatting checks, frontend/backend TypeScript checks, backend tests, the production build, routing tests, and desktop/mobile browser tests. Tests use fixtures and require no Flickr credentials. To use an installed Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium`.
+
+Individual commands:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run typecheck` | Check frontend and Worker TypeScript. |
+| `npm test` | Run Worker tests. |
+| `npm run test:assets` | Test combined routing; requires a build. |
+| `npm run test:browser` | Run browser tests; requires a build. |
+| `npm run build` | Build the frontend into `dist/`. |
+| `npm run preview` | Preview the frontend build; does not run the photo API. |
+| `npm run worker:check` | Validate the combined deployment with a dry-run; requires a build. |
+
+## Deployment
+
+The root `wrangler.jsonc` configures the `ozinoveva-photos` Worker with the frontend build in `dist/`. `/api/*` requests reach the Worker; other routes use static assets with a single-page-app fallback.
 
 ### Manual production publish
 
-`CI checks` (`.github/workflows/verify.yml`) validates pushes and pull requests without deployment credentials. `production publish` (`.github/workflows/production-publish.yml`) runs only through **Actions → production publish → Run workflow**, after the workflow is merged into the default branch. Select `master`. Both the original initiator and any rerun initiator must be `SlyCaptainFlint`; other branches, accounts, and forks skip the publish job. The workflow checks out the exact selected commit, reruns all checks and a deployment dry-run, then publishes the combined Worker and static assets. Pushes and merges do not trigger publishing.
+The **CI checks** workflow validates pushes to `master` and `feat/**`, and pull requests targeting `master`. It does not publish.
 
-Before the first publish, configure **Settings → Environments → production** (these settings are not created by this YAML):
+The **production publish** workflow manually deploys the combined Worker and frontend. It runs only on `master` in `SlyCaptainFlint/blazor-simple-site`, and both the original initiator and any rerun initiator must be `SlyCaptainFlint`.
 
-1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off so the owner can approve their own manual run. Disable administrator bypass of protection rules.
-2. Restrict deployment branches to the selected branch `master`, with no allowed tags.
-3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a Cloudflare token with Workers deployment permissions scoped to the intended account. Keep these credentials out of repository/organization secrets so other jobs cannot access them without environment approval.
-4. Verify that the existing Worker has its encrypted `FLICKR_API_KEY`; do not copy it into GitHub or frontend configuration. This workflow does not set or rotate it.
+Configure **Settings → Environments → production** in GitHub:
 
-Public visitors cannot manually dispatch this repository's workflows; GitHub requires write access. The actor guard is an additional check, not a substitute for environment protection: someone who can edit workflows could remove it. Keep repository administration trusted and protect `master` and workflow changes if granting others write access. No GitHub environment rules or secrets are configured by this change, and the publish workflow has not been run.
+1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off and disable administrator bypass.
+2. Allow deployments from the `master` branch only, with no allowed tags.
+3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token needs **Account → Workers Scripts → Edit**, scoped to the deployment account.
 
-See [backend setup, safety and diagnostics](backend/photos-worker/README.md) for the photo contract, current source selection, cache privacy window, resizing and secure secret configuration.
+Configure `FLICKR_API_KEY` as a secret on the Cloudflare Worker. The publishing workflow does not set or rotate it. The account must support Cloudflare image transformations.
+
+Once the workflow exists on the default branch, open **Actions → production publish → Run workflow**, select `master`, and approve the production environment deployment. The workflow checks out the selected commit, runs validation and a deployment dry-run, then publishes. Pushes and merges do not trigger publishing.

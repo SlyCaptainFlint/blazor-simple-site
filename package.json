@@ -17,8 +17,8 @@
     "worker:check": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc --dry-run --outdir dist-worker",
     "worker:dev": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --ip 127.0.0.1 --port 8787",
     "test:assets": "node --test tests/static-routing.test.mjs",
-    "format": "prettier --write src index.html",
-    "format:check": "prettier --check src index.html"
+    "format": "prettier --write src index.html backend/photos-worker/src/index.ts",
+    "format:check": "prettier --check src index.html backend/photos-worker/src/index.ts"
   },
   "dependencies": {
     "@fontsource/cairo": "^5.2.7",
