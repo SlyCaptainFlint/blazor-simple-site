@@ -13,10 +13,33 @@ export interface Photo {
 const DEFAULT_API = '/api/photos';
 const LIVE_API_ORIGIN = 'https://ozinoveva-photos.ozinoveva.workers.dev';
 export const PHOTOS_API = import.meta.env.VITE_PHOTOS_API_URL || DEFAULT_API;
+const GALLERY_TTL = 60 * 60 * 1000;
+let cachedGallery: { photos: Photo[]; expiresAt: number } | undefined;
+let pendingGallery: Promise<Photo[]> | undefined;
+const previews = new Map<string, HTMLImageElement>();
+
+/** Share metadata across routes without restarting an in-flight preload. */
+export async function loadPhotos(signal?: AbortSignal): Promise<Photo[]> {
+  signal?.throwIfAborted();
+  if (cachedGallery && Date.now() >= cachedGallery.expiresAt) {
+    cachedGallery = undefined;
+    previews.clear();
+  }
+  if (!cachedGallery) {
+    pendingGallery ??= fetchPhotos().finally(() => {
+      pendingGallery = undefined;
+    });
+    await pendingGallery;
+  }
+  signal?.throwIfAborted();
+  return cachedGallery!.photos;
+}
+
 /** Reject malformed service data; remote strings never become HTML. */
-export async function loadPhotos(signal: AbortSignal): Promise<Photo[]> {
+async function fetchPhotos(): Promise<Photo[]> {
   const response = await fetch(PHOTOS_API, {
-    signal,
+    signal: AbortSignal.timeout(10000),
+    priority: 'low',
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) {
@@ -36,7 +59,7 @@ export async function loadPhotos(signal: AbortSignal): Promise<Photo[]> {
     );
   }
   const api = new URL(PHOTOS_API, location.origin);
-  return payload.photos.slice(0, 50).map((value: unknown) => {
+  const photos = payload.photos.slice(0, 50).map((value: unknown) => {
     if (!value || typeof value !== 'object') {
       throw new Error('Invalid photo');
     }
@@ -96,6 +119,20 @@ export async function loadPhotos(signal: AbortSignal): Promise<Photo[]> {
       variants,
     };
   });
+  // Do not extend the Worker's metadata lifetime with a new client-side hour.
+  const fetchedAt =
+    'fetchedAt' in payload && typeof payload.fetchedAt === 'string'
+      ? Date.parse(payload.fetchedAt)
+      : Date.now();
+  cachedGallery = {
+    photos,
+    expiresAt:
+      Math.min(
+        Date.now(),
+        Number.isFinite(fetchedAt) ? fetchedAt : Date.now(),
+      ) + GALLERY_TTL,
+  };
+  return photos;
 }
 export function srcset(photo: Photo): string {
   const unique = new Map<number, string>();
@@ -105,4 +142,96 @@ export function srcset(photo: Photo): string {
     }
   }
   return [...unique].map(([width, url]) => `${url} ${width}w`).join(', ');
+}
+
+const PREVIEW_LIMIT = 4;
+const PREVIEW_SIZES =
+  '(max-width: 640px) calc((100vw - 24px) / 2), (max-width: 960px) calc((100vw - 48px) / 2), (max-width: 1280px) calc((100vw - 48px) / 3), 350px';
+
+/** Reuse the actual image node: no-store responses cannot be warmed via HTTP cache. */
+export function previewImage(photo: Photo, index: number): HTMLImageElement {
+  const existing = previews.get(photo.id);
+  if (existing) {
+    return existing;
+  }
+  const image = new Image();
+  image.alt = photo.title || `Photograph ${index + 1} by Olga Zinoveva`;
+  image.width = photo.width;
+  image.height = photo.height;
+  image.decoding = 'async';
+  image.loading = index < PREVIEW_LIMIT ? 'eager' : 'lazy';
+  image.fetchPriority = 'low';
+  image.sizes = PREVIEW_SIZES;
+  image.srcset = srcset({
+    ...photo,
+    variants: photo.variants.filter((variant) => variant.width <= 640),
+  });
+  image.src = photo.variants[0].url;
+  if (index < PREVIEW_LIMIT) {
+    previews.set(photo.id, image);
+    image.addEventListener('error', () => previews.delete(photo.id), {
+      once: true,
+    });
+  }
+  return image;
+}
+
+function constrainedConnection(): boolean {
+  const connection = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  return (
+    !!connection?.saveData ||
+    ['slow-2g', '2g', '3g'].includes(connection?.effectiveType || '')
+  );
+}
+
+function idle(): Promise<void> {
+  return new Promise((resolve) => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => resolve(), { timeout: 2000 });
+    } else {
+      setTimeout(resolve, 300);
+    }
+  });
+}
+
+/** Start metadata during idle time; warm just four previews after critical assets. */
+export function startPhotoPreload(): void {
+  void (async () => {
+    await idle();
+    if (constrainedConnection() || document.hidden) {
+      return;
+    }
+    const photos = await loadPhotos();
+    if (document.readyState !== 'complete') {
+      await new Promise<void>((resolve) =>
+        window.addEventListener('load', () => resolve(), { once: true }),
+      );
+    }
+    for (const [index, photo] of photos.slice(0, PREVIEW_LIMIT).entries()) {
+      await idle();
+      if (
+        constrainedConnection() ||
+        document.hidden ||
+        document.body.dataset.page === 'photography' ||
+        !cachedGallery ||
+        cachedGallery.photos !== photos ||
+        Date.now() >= cachedGallery.expiresAt
+      ) {
+        return;
+      }
+      const image = previewImage(photo, index);
+      // One speculative transfer at a time; failures must not affect the page.
+      try {
+        await image.decode();
+      } catch {
+        previews.delete(photo.id);
+      }
+    }
+  })().catch(() => {
+    /* Gallery navigation can retry a failed speculative request. */
+  });
 }

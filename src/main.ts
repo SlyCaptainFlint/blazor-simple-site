@@ -7,6 +7,7 @@ import './style.css';
 import { startBackground } from './background';
 import { renderAbout } from './about';
 import { renderGallery } from './gallery';
+import { startPhotoPreload } from './photos';
 
 interface Route {
   page: 'home' | 'about' | 'photography' | 'not-found';
@@ -125,3 +126,5 @@ window.addEventListener(
 );
 startBackground();
 void render(false, history.state?.site?.scroll || 0);
+
+startPhotoPreload();

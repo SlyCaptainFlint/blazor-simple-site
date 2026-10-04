@@ -95,5 +95,5 @@ test('photos have no corner links and lightbox shows only image and navigation c
   await expect(dialog.locator('img')).toHaveAttribute('alt','Photograph 1');
   await expect(dialog.locator('figcaption, a, .lightbox-count, .lightbox-source')).toHaveCount(0);
   await expect(page.locator('.lightbox-status')).toHaveText('');
-  await expect(dialog).toHaveText('× ‹ ›');
+  await expect(dialog).toHaveText('× ‹ ›', {useInnerText:true});
 });
