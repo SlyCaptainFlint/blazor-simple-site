@@ -23,7 +23,7 @@ export function startBackground(): void {
   let paused = reduced.matches;
   let elapsed = reduced.matches || location.pathname !== '/' ? INTRO_MS : 0;
   let previous = 0;
-  let painted = -Infinity;
+  let nextPaint = 0;
   let frame = 0;
   let cells: Cell[] = [];
 
@@ -117,9 +117,12 @@ export function startBackground(): void {
     frame = 0;
     if (previous) elapsed += now - previous;
     previous = now;
-    if (now - painted >= FRAME_MS) {
+    // Keep deadlines anchored instead of resetting them to a rounded rAF time.
+    // A small tolerance accommodates the browser's sub-millisecond timestamps.
+    if (now + 0.5 >= nextPaint) {
       paint();
-      painted = now;
+      nextPaint +=
+        Math.max(1, Math.floor((now - nextPaint) / FRAME_MS) + 1) * FRAME_MS;
     }
     frame = requestAnimationFrame(tick);
   }
