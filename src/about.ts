@@ -1,12 +1,5 @@
+import aboutHtml from './templates/about.html?raw';
+
 export function renderAbout(main: HTMLElement): void {
-  main.innerHTML = `<section class="about-page" aria-labelledby="page-title">
-    <aside class="profile"><img class="portrait" src="/portrait.jpg" width="600" height="900" alt="Portrait of Olga Zinoveva" />
-      <h1 id="page-title">Olga Zinoveva</h1><p class="subtitle">Software engineer, builder, artist.</p></aside>
-    <div class="about-copy">
-      <p>I made my first personal page on the Internet when I was 12. A virtual pet website, Neopets, allowed customizing the CSS on the pet pages, and having a beautiful one was a point of pride for serious players. This was a time when tiled textures and visitor counters were still in vogue, and the marquee tag felt like the magical apex of the Internet. My page was beautiful, but the internet has moved on, so it finally felt like the right time to make a new one.</p>
-      <section><h2>AllMyGames</h2><p>In 2018, I founded a startup. My co-founder and I first worked on Pollaborate, a service for making group decisions easy and fair. When we realized that we would need to pivot to B2B to make money, we pivoted to another product entirely — <a href="https://allmy.games">AllMyGames</a> — a place for gamers to discover, share, and organize their game collections. People love AllMyGames — some of our users have collections in the 1000s — but again, monetizing the product proved challenging, so we transitioned AllMyGames to a moonlighting project. It turns out that working on the service is more fun when you do it for your users, not investors!</p></section>
-      <section><h2>Photography</h2><p>I love all visual art, but photography has a special place in my heart. I got my first DSLR right after college, and I haven't been separated from it for long ever since. Over time, I have upgraded my hardware and the software I use to process photos, but the biggest upgrade by far has been to my skill. I am no expert by any means, but I'm always getting better and looking for a new perspective. I most enjoy capturing the beauty of cities and landscapes, fleeting feelings and transient moments.</p></section>
-      <section><h2>About this site</h2><p>Originally built with Blazor, this site now uses TypeScript and Vite, with photos from Flickr and image resizing by Cloudflare. The background was made in Adobe After Effects using a template from <a href="https://www.animoplex.com/">Animoplex</a>. All source code is available on <a href="https://github.com/SlyCaptainFlint/blazor-simple-site">GitHub</a>.</p></section>
-    </div>
-  </section>`;
+  main.innerHTML = aboutHtml;
 }

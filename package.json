@@ -13,18 +13,21 @@
     "typecheck": "tsc --noEmit && npm --prefix backend/photos-worker run typecheck",
     "test": "npm --prefix backend/photos-worker test",
     "test:browser": "playwright test",
-    "check": "npm run typecheck && npm test && npm run build && npm run test:assets && npm run test:browser",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run test:assets && npm run test:browser",
     "worker:check": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc --dry-run --outdir dist-worker",
     "worker:dev": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --ip 127.0.0.1 --port 8787",
-    "test:assets": "node --test tests/static-routing.test.mjs"
+    "test:assets": "node --test tests/static-routing.test.mjs",
+    "format": "prettier --write src index.html",
+    "format:check": "prettier --check src index.html"
   },
   "dependencies": {
-    "@fontsource/poiret-one": "^5.2.7",
-    "@fontsource/cairo": "^5.2.7"
+    "@fontsource/cairo": "^5.2.7",
+    "@fontsource/poiret-one": "^5.2.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@types/node": "^24",
+    "prettier": "3.6.2",
     "typescript": "^5.9",
     "vite": "^7"
   }

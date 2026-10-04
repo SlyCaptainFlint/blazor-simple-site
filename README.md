@@ -16,6 +16,14 @@ npm run dev
 
 Vite's development proxy forwards `/api` read-only to the existing `ozinoveva-photos.ozinoveva.workers.dev` service. No Flickr credentials are used by the frontend. A network that cannot reach that host will show the gallery error/retry state. Never place a Flickr key in `VITE_*`, HTML, or checked-in files.
 
+## Editing the frontend
+
+Page and component markup lives in `src/templates/*.html`. The persistent navigation and background shell live in `index.html`. TypeScript modules in `src/` handle routing, data, and interactions; `src/style.css` contains the styles.
+
+Vite imports the HTML templates as strings through `?raw` imports. Dynamic photo titles and attributes are assigned through DOM properties in TypeScript.
+
+Run `npm run format` to format frontend TypeScript, HTML, and CSS. `npm run format:check` checks formatting without changing files and is included in CI validation.
+
 ## Validation
 
 ```sh
