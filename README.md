@@ -63,7 +63,3 @@ Before the first publish, configure **Settings → Environments → production**
 Public visitors cannot manually dispatch this repository's workflows; GitHub requires write access. The actor guard is an additional check, not a substitute for environment protection: someone who can edit workflows could remove it. Keep repository administration trusted and protect `master` and workflow changes if granting others write access. No GitHub environment rules or secrets are configured by this change, and the publish workflow has not been run.
 
 See [backend setup, safety and diagnostics](backend/photos-worker/README.md) for the photo contract, current source selection, cache privacy window, resizing and secure secret configuration.
-
-## Review screenshots
-
-See [the review gallery](docs/review/README.md). Screenshots show the production build, not design mockups. The local environment's proxy denied access to workers.dev, so gallery screenshots use the site's existing public S3 photos as temporary browser test fixtures with generic titles. They demonstrate layout and interaction, **not** fresh Flickr data or production resizing. No test fixtures or screenshots are shipped in `dist/`.
