@@ -199,3 +199,41 @@ test('safe image diagnostics distinguish HTTP, resizing errors and absent transf
     assert.equal(logs.some(log=>log.includes('private-key')||log.includes('https://')),false);
   } finally {console.error=original;}
 });
+
+
+test('browser image caching expires with gallery metadata, rounding down partial seconds', async () => {
+  const s = setup();
+  const first = await s.get('/api/photos/123/640.jpg');
+  assert.equal(first.headers.get('Cache-Control'), 'private, max-age=3600, must-revalidate');
+  s.advance(1800500);
+  const later = await s.get('/api/photos/123/640.jpg');
+  assert.equal(later.headers.get('Cache-Control'), 'private, max-age=1799, must-revalidate');
+  s.advance(1799000);
+  const expiring = await s.get('/api/photos/123/640.jpg');
+  assert.equal(expiring.headers.get('Cache-Control'), 'private, max-age=0, must-revalidate');
+  s.set(payload([]));
+  s.advance(500);
+  const removed = await s.get('/api/photos/123/640.jpg');
+  assert.equal(removed.status, 404);
+  assert.equal(removed.headers.get('Cache-Control'), 'no-store');
+});
+
+test('image failures remain uncacheable', async () => {
+  const s = setup();
+  s.imageType('text/html');
+  const response = await s.get('/api/photos/123/640.jpg');
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+
+test('cacheable images vary on Origin even when no CORS permission is returned', async () => {
+  const s = setup();
+  const env = { FLICKR_API_KEY: 'key', ALLOWED_ORIGIN: 'https://site.example' };
+  for (const origin of [undefined, 'https://evil.example', env.ALLOWED_ORIGIN]) {
+    const response = await s.get('/api/photos/123/640.jpg', env, {
+      headers: origin ? { Origin: origin } : {},
+    });
+    assert.deepEqual(response.headers.get('Vary')?.split(',').map(v => v.trim()).sort(), ['Accept', 'Origin']);
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin === env.ALLOWED_ORIGIN ? origin : null);
+  }
+});

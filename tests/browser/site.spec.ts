@@ -289,7 +289,7 @@ test('photos have no corner links and lightbox shows only image and navigation c
     dialog.locator('figcaption, a, .lightbox-count, .lightbox-source'),
   ).toHaveCount(0);
   await expect(page.locator('.lightbox-status')).toHaveText('');
-  await expect(dialog).toHaveText('× ‹ ›');
+  await expect(dialog).toHaveText('× ‹ ›', {useInnerText:true});
 });
 
 test('SVG resize and pause preserve active time and direct routes skip the intro', async ({

@@ -345,13 +345,45 @@ body[data-page='home'] #main {
 .lightbox-next {
   right: 8px;
 }
-.lightbox-status {
+.lightbox-image {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 250ms ease;
+}
+.lightbox-image.is-ready {
+  opacity: 1;
+  visibility: visible;
+}
+.lightbox-feedback {
   position: absolute;
-  bottom: 12px;
-  left: 48px;
-  right: 48px;
+  inset: 50% 64px auto;
+  transform: translateY(-50%);
   text-align: center;
+  pointer-events: none;
+}
+.lightbox-retry {
+  pointer-events: auto;
+}
+.lightbox-status {
   font-size: 13px;
+  color: #d8c9e4;
+}
+.lightbox-status:empty {
+  display: none;
+}
+.lightbox-loading {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #bba8d033;
+  border-top-color: #d8b7ee;
+  border-radius: 50%;
+  animation: photo-loading 900ms linear infinite;
+}
+@keyframes photo-loading {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .not-found {
   padding: 80px 0;

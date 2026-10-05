@@ -3,7 +3,7 @@ import galleryErrorHtml from './templates/gallery-error.html?raw';
 import photoCardHtml from './templates/photo-card.html?raw';
 import lightboxHtml from './templates/lightbox.html?raw';
 import { createTemplateElement } from './template';
-import { loadPhotos, srcset, type Photo } from './photos';
+import { loadPhotos, previewImage, srcset, type Photo } from './photos';
 
 export async function renderGallery(
   main: HTMLElement,
@@ -25,21 +25,19 @@ export async function renderGallery(
     const lightbox = createLightbox(photos, signal);
     photos.forEach((photo, index) => {
       const card = createTemplateElement<HTMLDivElement>(photoCardHtml);
+      // Adopt the template into the live document before moving a warmed image.
+      grid.append(card);
       const button = card.querySelector<HTMLButtonElement>('.photo-open')!;
       button.setAttribute(
         'aria-label',
         `Open ${photo.title || `photograph ${index + 1}`}`,
       );
-      const image = card.querySelector<HTMLImageElement>('img')!;
-      image.alt = photo.title || `Photograph ${index + 1} by Olga Zinoveva`;
-      image.width = photo.width;
-      image.height = photo.height;
-      image.loading = index < 4 ? 'eager' : 'lazy';
-      image.decoding = 'async';
-      image.sizes =
-        '(max-width: 640px) calc((100vw - 24px) / 2), (max-width: 960px) calc((100vw - 48px) / 2), (max-width: 1280px) calc((100vw - 48px) / 3), 350px';
-      image.srcset = srcset(photo);
-      image.src = photo.variants[0].url;
+      const image = previewImage(photo, index);
+      image.fetchPriority = 'auto';
+      card.querySelector('img')!.replaceWith(image);
+      if (image.complete && image.naturalWidth) {
+        button.classList.add('loaded');
+      }
       image.addEventListener('load', () => button.classList.add('loaded'), {
         signal,
       });
@@ -55,7 +53,6 @@ export async function renderGallery(
       button.addEventListener('click', () => lightbox.open(index, button), {
         signal,
       });
-      grid.append(card);
     });
   } catch {
     if (signal.aborted) {
@@ -84,41 +81,86 @@ function createLightbox(
   let index = 0;
   let trigger: HTMLElement | null = null;
   let previousOverflow = '';
+  const spinner = dialog.querySelector<HTMLElement>('.lightbox-loading')!;
+  const retry = dialog.querySelector<HTMLButtonElement>('.lightbox-retry')!;
+  let cancelImage = () => {};
+  let sequence = 0;
+
   function show(next: number): void {
+    cancelImage();
+    const current = ++sequence;
+    const controller = new AbortController();
     index = (next + photos.length) % photos.length;
     const photo = photos[index];
     dialog.setAttribute('aria-label', photo.title || 'Untitled photograph');
+    wrap.setAttribute('aria-busy', 'true');
     status.textContent = 'Loading photograph…';
-    const image = document.createElement('img');
+    spinner.hidden = false;
+    retry.hidden = true;
+    const image = new Image();
     image.alt = photo.title || 'Untitled photograph';
     image.width = photo.width;
     image.height = photo.height;
+    image.decoding = 'async';
+    image.className = 'lightbox-image';
+    let timeout: ReturnType<typeof setTimeout>;
+    let finished = false;
+    const active = () =>
+      current === sequence && dialog.open && !signal.aborted && !finished;
+    function fail(): void {
+      if (!active()) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timeout);
+      wrap.setAttribute('aria-busy', 'false');
+      spinner.hidden = true;
+      retry.hidden = false;
+      status.textContent =
+        'This photograph could not load. Try again or choose another photograph.';
+    }
     image.addEventListener(
       'load',
       () => {
-        if (wrap.contains(image)) {
-          status.textContent = '';
-        }
+        void image
+          .decode()
+          .then(() => {
+            if (!active()) {
+              return;
+            }
+            finished = true;
+            clearTimeout(timeout);
+            spinner.hidden = true;
+            retry.hidden = true;
+            status.textContent = '';
+            wrap.setAttribute('aria-busy', 'false');
+            image.classList.add('is-ready');
+          })
+          .catch(fail);
       },
-      { signal },
+      { signal: controller.signal, once: true },
     );
-    image.addEventListener(
-      'error',
-      () => {
-        if (wrap.contains(image)) {
-          status.textContent =
-            'This photograph could not load. Try the next photograph.';
-          image.hidden = true;
-        }
-      },
-      { signal },
-    );
+    image.addEventListener('error', fail, {
+      signal: controller.signal,
+      once: true,
+    });
     image.sizes = '(max-width: 640px) calc(100vw - 32px), 90vw';
     image.srcset = srcset(photo);
     image.src = photo.variants.at(-1)!.url;
     wrap.replaceChildren(image);
+    timeout = setTimeout(fail, 20000);
+    cancelImage = () => {
+      ++sequence;
+      clearTimeout(timeout);
+      controller.abort();
+      image.removeAttribute('srcset');
+      image.removeAttribute('src');
+      wrap.replaceChildren();
+    };
   }
+  retry.addEventListener('click', () => show(index), { signal });
   function restore(): void {
+    cancelImage();
     document.body.style.overflow = previousOverflow;
     if (!signal.aborted && trigger?.isConnected) {
       trigger.focus({ preventScroll: true });
@@ -165,6 +207,7 @@ function createLightbox(
         dialog.close();
         restore();
       }
+      cancelImage();
       dialog.remove();
     },
     { once: true },

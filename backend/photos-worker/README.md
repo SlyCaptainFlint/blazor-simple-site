@@ -32,7 +32,7 @@ Supported width presets: `320`, `640`, `960`, `1440`, and `1920`.
 
 The `Accept` header selects AVIF, WebP, or JPEG. Without an explicit format preference, JPEG is used. The `.jpg` suffix stays the same for all formats; the response `Content-Type` identifies the actual format. Image responses include `Vary: Accept`.
 
-API responses use `Cache-Control: no-store`. Do not override this with a cache rule that bypasses the gallery-membership check.
+Successful image responses use `Cache-Control: private, max-age=<seconds>, must-revalidate`. Browsers can reuse them for up to one hour, capped at the remaining lifetime of the gallery metadata. Cached photos may remain visible after removal from Flickr until that time expires. Metadata and error responses use `Cache-Control: no-store`.
 
 ### Errors
 
