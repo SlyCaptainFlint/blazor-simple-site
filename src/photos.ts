@@ -9,6 +9,7 @@ export interface Photo {
   width: number;
   height: number;
   variants: Variant[];
+  fullSizeUrl?: string;
 }
 const DEFAULT_API = '/api/photos';
 const LIVE_API_ORIGIN = 'https://ozinoveva-photos.ozinoveva.workers.dev';
@@ -110,6 +111,27 @@ async function fetchPhotos(): Promise<Photo[]> {
         width: v.width,
       };
     });
+    let fullSizeUrl: string | undefined;
+    if (p.fullSizeUrl !== undefined) {
+      if (typeof p.fullSizeUrl !== 'string')
+        throw new Error('Invalid source image');
+      const url = new URL(p.fullSizeUrl, api);
+      if (
+        (url.origin !== api.origin &&
+          !(PHOTOS_API === DEFAULT_API && url.origin === LIVE_API_ORIGIN)) ||
+        url.username ||
+        url.password ||
+        url.pathname !== `/api/photos/source-v1/${p.id}.jpg` ||
+        url.search ||
+        url.hash
+      ) {
+        throw new Error('Invalid source image');
+      }
+      fullSizeUrl =
+        PHOTOS_API === DEFAULT_API || url.origin === location.origin
+          ? url.pathname
+          : url.href;
+    }
     return {
       id: p.id,
       title: p.title,
@@ -117,6 +139,7 @@ async function fetchPhotos(): Promise<Photo[]> {
       height: p.height,
       pageUrl: `https://www.flickr.com/photos/93665003@N05/${p.id}/`,
       variants,
+      fullSizeUrl,
     };
   });
   // Do not extend the Worker's metadata lifetime with a new client-side hour.

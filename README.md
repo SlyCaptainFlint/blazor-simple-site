@@ -4,6 +4,8 @@ A personal website built with TypeScript and Vite, served by Cloudflare Workers.
 
 Gallery metadata begins loading during idle time on the initial page. On unconstrained connections, up to four responsive previews (at most 640 pixels wide) warm sequentially after page load and are reused when opening Photography. Metadata and these previews remain in memory only until the server metadata expires; full-size lightbox images load on demand and fade in after decoding. Loads longer than 180 ms show a blurred preview with a shimmer (static with reduced motion). Images fit the viewport with overlay navigation controls. Successful photo responses can also be cached by the browser until the server metadata expires, for up to one hour.
 
+The lightbox currently uses an untransformed Flickr source for a fetch-latency diagnostic; gallery thumbnails remain resized. See the [Worker measurement instructions](backend/photos-worker/README.md#measure-image-request-latency) for timing headers, logs, comparisons, and restoring resized delivery.
+
 The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts and the portrait are served locally. The programmatic SVG background uses one shell-owned active-time clock: a 2.6-second home reveal followed by slowly drifting purple light clusters. Route navigation never restarts it. Geometry adapts on resize, opacity updates are capped at 30 Hz, and hidden tabs stop requesting frames. Reduced motion starts with a static field; the existing play control allows an explicit opt-in.
 
 ## Requirements and setup

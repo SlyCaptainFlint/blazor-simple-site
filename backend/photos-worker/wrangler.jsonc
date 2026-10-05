@@ -6,7 +6,8 @@
   "workers_dev": true,
   "preview_urls": false,
   "vars": {
-    "ALLOWED_ORIGIN": ""
+    "ALLOWED_ORIGIN": "",
+    "PHOTO_LIGHTBOX_MODE": "source-v1"
   },
   "observability": { "enabled": false }
 }

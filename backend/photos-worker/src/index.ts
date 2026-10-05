@@ -2,6 +2,8 @@ export interface Env {
   FLICKR_API_KEY?: string;
   /** Optional exact frontend origin, e.g. https://example.com. Empty = same origin only. */
   ALLOWED_ORIGIN?: string;
+  /** Use the untransformed Flickr source for diagnostic lightbox requests. */
+  PHOTO_LIGHTBOX_MODE?: 'source-v1' | 'resized';
 }
 
 const USER_ID = '93665003@N05';
@@ -32,7 +34,31 @@ interface Dependencies {
   fetch: typeof fetch;
   cache: Pick<Cache, 'match' | 'put'>;
   now: () => number;
+  reportTiming?: (timing: ImageTiming) => void;
 }
+
+type GalleryCacheState = 'hit' | 'miss' | 'shared';
+interface ImageTiming {
+  event: 'photo_request_timing';
+  requestId: string;
+  mode: 'source-v1' | 'resized';
+  galleryCache: GalleryCacheState;
+  galleryMs: number;
+  upstreamMs?: number;
+  upstreamCache?: string;
+  status: number;
+}
+
+const CACHE_STATES = new Set([
+  'HIT',
+  'MISS',
+  'EXPIRED',
+  'STALE',
+  'BYPASS',
+  'DYNAMIC',
+  'REVALIDATED',
+  'UPDATING',
+]);
 
 interface Diagnostic {
   stage:
@@ -221,7 +247,11 @@ export function createHandler(dependencies: Dependencies) {
   // Concurrent cache misses share one Flickr request within this Worker instance.
   // Requests with a new API key do not reuse a pending request made with the old key.
   let pending: { key: string; task: Promise<Gallery> } | undefined;
-  async function gallery(request: Request, key: string): Promise<Gallery> {
+  async function gallery(
+    request: Request,
+    key: string,
+    onCache?: (state: GalleryCacheState) => void,
+  ): Promise<Gallery> {
     const cacheKey = new Request(
       new URL('/__internal/gallery-v2', request.url),
     );
@@ -231,6 +261,7 @@ export function createHandler(dependencies: Dependencies) {
         const saved = await hit.json<Gallery>();
         const age = dependencies.now() - Date.parse(saved.fetchedAt);
         if (age >= 0 && age < TTL * 1000) {
+          onCache?.('hit');
           return saved;
         }
       }
@@ -238,8 +269,10 @@ export function createHandler(dependencies: Dependencies) {
       /* A cache outage must not prevent a fresh, authoritative query. */
     }
     if (pending?.key === key) {
+      onCache?.('shared');
       return pending.task;
     }
+    onCache?.('miss');
     const task = (async () => {
       const url = new URL('https://www.flickr.com/services/rest/');
       url.search = new URLSearchParams({
@@ -326,6 +359,27 @@ export function createHandler(dependencies: Dependencies) {
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     });
+    let timing: ImageTiming | undefined;
+    const elapsed = (start: number) =>
+      Math.min(60000, Math.max(0, Math.round(dependencies.now() - start)));
+    function finishTiming(status: number): void {
+      if (!timing) return;
+      timing.status = status;
+      const measurements = [`gallery;dur=${timing.galleryMs}`];
+      if (timing.upstreamMs !== undefined) {
+        measurements.push(`upstream;dur=${timing.upstreamMs}`);
+      }
+      headers.set('Server-Timing', measurements.join(', '));
+      headers.set('X-Photo-Request-ID', timing.requestId);
+      headers.set('X-Photo-Mode', timing.mode);
+      headers.set('X-Photo-Gallery-Cache', timing.galleryCache);
+      headers.set('X-Photo-Upstream-Cache', timing.upstreamCache ?? 'UNKNOWN');
+      if (dependencies.reportTiming) {
+        dependencies.reportTiming(timing);
+      } else {
+        console.info(JSON.stringify(timing));
+      }
+    }
     const origin = request.headers.get('Origin');
     if (env.ALLOWED_ORIGIN) {
       headers.set('Vary', 'Origin');
@@ -334,6 +388,7 @@ export function createHandler(dependencies: Dependencies) {
       headers.set('Access-Control-Allow-Origin', origin);
     }
     function json(body: unknown, status = 200): Response {
+      finishTiming(status);
       const responseHeaders = new Headers(headers);
       responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
       return new Response(JSON.stringify(body), {
@@ -343,10 +398,13 @@ export function createHandler(dependencies: Dependencies) {
     }
     try {
       const url = new URL(request.url);
+      const direct = /^\/api\/photos\/source-v1\/(\d+)\.jpg$/.exec(
+        url.pathname,
+      );
       const image = /^\/api\/photos\/(\d+)\/(320|640|960|1440|1920)\.jpg$/.exec(
         url.pathname,
       );
-      if (url.pathname !== '/api/photos' && !image) {
+      if (url.pathname !== '/api/photos' && !image && !direct) {
         return json({ error: 'not_found' }, 404);
       }
       if (request.method !== 'GET') {
@@ -356,26 +414,48 @@ export function createHandler(dependencies: Dependencies) {
       if (url.search) {
         return json({ error: 'query_parameters_not_allowed' }, 400);
       }
-      if (image) {
+      if (image || direct) {
         headers.append('Vary', 'Accept');
       }
-      const format = image
-        ? negotiateFormat(request.headers.get('Accept'))
-        : null;
-      if (image && !format) {
+      const format =
+        image || direct ? negotiateFormat(request.headers.get('Accept')) : null;
+      if ((image || direct) && !format) {
         return json({ error: 'not_acceptable' }, 406);
       }
       const key = env.FLICKR_API_KEY?.trim();
       if (!key) {
         return json({ error: 'service_not_configured' }, 503);
       }
-      const data = await gallery(request, key);
-      if (!image) {
+      if (image || direct) {
+        timing = {
+          event: 'photo_request_timing',
+          requestId: crypto.randomUUID(),
+          mode: direct ? 'source-v1' : 'resized',
+          galleryCache: 'miss',
+          galleryMs: 0,
+          status: 200,
+        };
+      }
+      let data: Gallery;
+      const galleryStart = dependencies.now();
+      try {
+        data = await gallery(request, key, (state) => {
+          if (timing) timing.galleryCache = state;
+        });
+      } finally {
+        if (timing) timing.galleryMs = elapsed(galleryStart);
+      }
+      if (!image && !direct) {
         return json({
           fetchedAt: data.fetchedAt,
           limit: LIMIT,
           photos: data.photos.map((p) => ({
             ...p,
+            ...(env.PHOTO_LIGHTBOX_MODE === 'source-v1'
+              ? {
+                  fullSizeUrl: `${url.origin}/api/photos/source-v1/${p.id}.jpg`,
+                }
+              : {}),
             variants: WIDTHS.map((width) => ({
               width: Math.min(width, p.width),
               url: `${url.origin}/api/photos/${p.id}/${width}.jpg`,
@@ -383,20 +463,21 @@ export function createHandler(dependencies: Dependencies) {
           })),
         });
       }
-      const photo = data.photos.find((p) => p.id === image[1]);
+      const photoId = (direct ?? image)![1];
+      const photo = data.photos.find((p) => p.id === photoId);
       if (!photo) {
         return json({ error: 'photo_not_found' }, 404);
       }
       const source = photo.sources[0];
       // Requests that reach the Worker check membership before using a cached transform.
-      let resized: Response;
+      let upstream: Response;
       const signal = AbortSignal.timeout(15000);
+      const upstreamStart = dependencies.now();
       try {
         // workerd rejects redirect: 'error' before fetching. Manual + status checks never follows redirects.
-        resized = await dependencies.fetch(source.url, {
-          redirect: 'manual',
-          signal,
-          cf: {
+        const options: RequestInit = { redirect: 'manual', signal };
+        if (image) {
+          options.cf = {
             image: {
               width: Number(image[2]),
               fit: 'scale-down',
@@ -404,19 +485,29 @@ export function createHandler(dependencies: Dependencies) {
               format: format!,
               metadata: 'none',
             },
-          },
-        });
+          };
+        }
+        // Source requests omit cf.image entirely and stream the same Flickr rendition.
+        upstream = await dependencies.fetch(source.url, options);
       } catch {
         throw new ServiceError(502, 'image_unavailable', {
           stage: signal.aborted ? 'image_timeout' : 'image_fetch',
         });
+      } finally {
+        if (timing) timing.upstreamMs = elapsed(upstreamStart);
       }
-      const resizeHeader = resized.headers.get('Cf-Resized');
+      const cacheState = upstream.headers.get('CF-Cache-Status') ?? '';
+      if (timing) {
+        timing.upstreamCache = CACHE_STATES.has(cacheState)
+          ? cacheState
+          : 'UNKNOWN';
+      }
+      const resizeHeader = upstream.headers.get('Cf-Resized');
       const codeMatch = resizeHeader?.match(
         /(?:^|[;,\s])err=(\d{4})(?=$|[;,\s])/,
       );
       const resizeCode = codeMatch ? Number(codeMatch[1]) : undefined;
-      const contentType = resized.headers
+      const contentType = upstream.headers
         .get('Content-Type')
         ?.split(';')[0]
         .trim()
@@ -430,33 +521,41 @@ export function createHandler(dependencies: Dependencies) {
               ? 'jpeg'
               : null;
       let stage: Diagnostic['stage'] | undefined;
-      if (!resized.ok) {
+      if (!upstream.ok) {
         stage = 'image_http';
-      } else if (resized.redirected) {
+      } else if (upstream.redirected) {
         stage = 'image_redirect';
-      } else if (resizeCode !== undefined) {
+      } else if (image && resizeCode !== undefined) {
         stage = 'image_transform';
-      } else if (!resizeHeader) {
+      } else if (image && !resizeHeader) {
         stage = 'image_untransformed';
       }
       // Cloudflare may fall back from AVIF. Only return a format this client accepts.
       else if (
         !actualFormat ||
-        !negotiateFormat(request.headers.get('Accept'), [actualFormat])
+        (!direct &&
+          !negotiateFormat(request.headers.get('Accept'), [actualFormat]))
       ) {
         stage = 'image_format';
       }
       if (stage) {
         try {
-          await resized.body?.cancel();
+          await upstream.body?.cancel();
         } catch {
           /* Preserve safe diagnostic if cancelling fails. */
         }
         throw new ServiceError(502, 'image_unavailable', {
           stage,
-          upstreamStatus: resized.status,
+          upstreamStatus: upstream.status,
           ...(resizeCode === undefined ? {} : { resizeCode }),
         });
+      }
+      if (
+        direct &&
+        !negotiateFormat(request.headers.get('Accept'), [actualFormat!])
+      ) {
+        await upstream.body?.cancel();
+        return json({ error: 'not_acceptable' }, 406);
       }
       // Browser copies expire with the gallery metadata used to approve this photo.
       const remainingSeconds = Math.max(
@@ -474,7 +573,8 @@ export function createHandler(dependencies: Dependencies) {
         `private, max-age=${remainingSeconds}, must-revalidate`,
       );
       headers.set('Content-Type', contentType!);
-      return new Response(resized.body, { headers });
+      finishTiming(200);
+      return new Response(upstream.body, { headers });
     } catch (e) {
       const error =
         e instanceof ServiceError
