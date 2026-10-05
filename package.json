@@ -15,8 +15,10 @@
     "test:browser": "playwright test",
     "check": "npm run format:check && npm run typecheck && npm test && npm run build && npm run test:assets && npm run test:browser",
     "worker:check": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc --dry-run --outdir dist-worker",
+    "worker:check:staging": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js deploy --config wrangler.jsonc --env staging --dry-run --outdir dist-worker/staging",
+    "worker:dev:staging": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --env staging --ip 127.0.0.1 --port 8787",
     "worker:dev": "node backend/photos-worker/node_modules/wrangler/bin/wrangler.js dev --config wrangler.jsonc --ip 127.0.0.1 --port 8787",
-    "test:assets": "node --test tests/static-routing.test.mjs",
+    "test:assets": "node --test tests/deployment-config.test.mjs tests/static-routing.test.mjs",
     "format": "prettier --write src index.html backend/photos-worker/src/index.ts",
     "format:check": "prettier --check src index.html backend/photos-worker/src/index.ts"
   },

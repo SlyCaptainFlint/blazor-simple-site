@@ -71,7 +71,7 @@ npx playwright install --with-deps chromium
 npm run check
 ```
 
-`check` runs formatting checks, frontend/backend TypeScript checks, backend tests, the production build, routing tests, and desktop/mobile browser tests. Tests use fixtures and require no Flickr credentials. To use an installed Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium`.
+`check` runs formatting checks, frontend/backend TypeScript checks, backend tests, the production build, deployment configuration and routing tests for production and staging, and desktop/mobile browser tests. Tests use fixtures and require no Flickr credentials. To use an installed Chromium, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium`.
 
 Individual commands:
 
@@ -79,11 +79,13 @@ Individual commands:
 | --- | --- |
 | `npm run typecheck` | Check frontend and Worker TypeScript. |
 | `npm test` | Run Worker tests. |
-| `npm run test:assets` | Test combined routing; requires a build. |
+| `npm run test:assets` | Check deployment targets and combined routing in production and staging; requires a build. |
 | `npm run test:browser` | Run browser tests; requires a build. |
 | `npm run build` | Build the frontend into `dist/`. |
 | `npm run preview` | Preview the frontend build; does not run the photo API. |
 | `npm run worker:check` | Validate the combined deployment with a dry-run; requires a build. |
+| `npm run worker:check:staging` | Validate the staging deployment with a dry-run; requires a build. |
+| `npm run worker:dev:staging` | Run the staging configuration locally on port 8787; requires a build. |
 
 ## Deployment
 
@@ -104,3 +106,21 @@ Configure **Settings → Environments → production** in GitHub:
 Configure `FLICKR_API_KEY` as a secret on the Cloudflare Worker. The publishing workflow does not set or rotate it.
 
 Once the workflow exists on the default branch, open **Actions → production publish → Run workflow**, select `master`, and approve the production environment deployment. The workflow checks out the selected commit, runs validation and a deployment dry-run, then publishes. Pushes and merges do not trigger publishing.
+
+### Manual staging publish
+
+The **staging publish** workflow deploys the combined site and API to the separate `ozinoveva-photos-staging` Worker using the root configuration's `staging` environment. It has no custom-domain routes. In the current Cloudflare account, its URL after publishing is `https://ozinoveva-photos-staging.ozinoveva.workers.dev`. Each publish replaces the shared staging site.
+
+Configure **Settings → Environments → staging** in GitHub before the first run:
+
+1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off and disable administrator bypass.
+2. Under **Deployment branches and tags**, choose **Selected branches and tags**. Add a rule with **Ref type: Branch** and name pattern `**/*`, which covers branch names with any number of `/` separators, including none. Do not add any **Tag** rules. GitHub uses [Ruby `fnmatch` patterns](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags); the recursive `**/` prefix covers nested branch names.
+3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a dedicated token with **Account → Workers Scripts → Edit**, scoped to the deployment account. This permission applies to Workers across that account; it is not restricted to the staging Worker name. Keep these secrets in the environment rather than at repository scope.
+
+After this workflow has been merged into the default branch, open **Actions → staging publish → Run workflow** and select any branch containing the workflow and staging configuration. Nested branch names are supported; tags are rejected. Only `SlyCaptainFlint` may initiate or rerun it. Review the selected commit before approving the staging environment: the selected branch supplies the code and workflow that will run. The workflow validates the site, tests both routing configurations, performs a staging dry-run, and publishes that commit. It does not run automatically on pushes or pull requests.
+
+After the first staging publish, set the `FLICKR_API_KEY` secret on **`ozinoveva-photos-staging`** in Cloudflare. Secrets are configured separately for each Worker; the production secret is not inherited. The same Flickr key may be used, sharing its quota. Until the secret is configured, the staging site loads but the photo API returns `503`. The workflow does not set or rotate this secret. Subsequent publishes retain it.
+
+Photo requests use `/api/photos/renditions-v1` on the staging origin. The workflow explicitly sets that build-time endpoint. Staging is publicly accessible at its `workers.dev` URL unless Cloudflare Access is configured separately.
+
+For local testing, run `npm run build` followed by `npm run worker:dev:staging`. Put a local Flickr key in ignored `.dev.vars.staging` at the repository root; Wrangler falls back to `.dev.vars` if the staging file is absent. Use the root `wrangler.jsonc` with `--env staging` for staging commands; the backend-only configuration targets the production Worker.

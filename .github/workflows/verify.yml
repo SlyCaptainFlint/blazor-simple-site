@@ -29,6 +29,10 @@ jobs:
         run: npm run worker:check
         env:
           WRANGLER_SEND_METRICS: 'false'
+      - name: Validate staging Worker and static assets (never deploy)
+        run: npm run worker:check:staging
+        env:
+          WRANGLER_SEND_METRICS: 'false'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
