@@ -76,12 +76,14 @@ function createLightbox(
   const dialog = createTemplateElement<HTMLDialogElement>(lightboxHtml);
   document.body.append(dialog);
   const close = dialog.querySelector<HTMLButtonElement>('.lightbox-close')!;
+  const stage = dialog.querySelector<HTMLElement>('.lightbox-stage')!;
   const wrap = dialog.querySelector<HTMLElement>('.lightbox-image-wrap')!;
   const status = dialog.querySelector<HTMLElement>('.lightbox-status')!;
   let index = 0;
   let trigger: HTMLElement | null = null;
   let previousOverflow = '';
-  const spinner = dialog.querySelector<HTMLElement>('.lightbox-loading')!;
+  const loading = dialog.querySelector<HTMLElement>('.lightbox-loading')!;
+  const preview = dialog.querySelector<HTMLElement>('.lightbox-preview')!;
   const retry = dialog.querySelector<HTMLButtonElement>('.lightbox-retry')!;
   let cancelImage = () => {};
   let sequence = 0;
@@ -94,8 +96,18 @@ function createLightbox(
     const photo = photos[index];
     dialog.setAttribute('aria-label', photo.title || 'Untitled photograph');
     wrap.setAttribute('aria-busy', 'true');
-    status.textContent = 'Loading photograph…';
-    spinner.hidden = false;
+    status.textContent = '';
+    status.classList.remove('is-loading');
+    loading.hidden = true;
+    const thumbnail =
+      document.querySelectorAll<HTMLImageElement>('.photo-open img')[index];
+    preview.style.backgroundImage =
+      thumbnail?.complete && thumbnail.naturalWidth
+        ? `url(${JSON.stringify(thumbnail.currentSrc)})`
+        : '';
+    // Fit the placeholder and final photo to the same aspect ratio.
+    stage.style.aspectRatio = `${photo.width} / ${photo.height}`;
+    stage.style.width = `min(100%, calc((100dvh - 16px) * ${photo.width / photo.height}))`;
     retry.hidden = true;
     const image = new Image();
     image.alt = photo.title || 'Untitled photograph';
@@ -104,6 +116,7 @@ function createLightbox(
     image.decoding = 'async';
     image.className = 'lightbox-image';
     let timeout: ReturnType<typeof setTimeout>;
+    let loadingDelay: ReturnType<typeof setTimeout>;
     let finished = false;
     const active = () =>
       current === sequence && dialog.open && !signal.aborted && !finished;
@@ -113,8 +126,10 @@ function createLightbox(
       }
       finished = true;
       clearTimeout(timeout);
+      clearTimeout(loadingDelay);
       wrap.setAttribute('aria-busy', 'false');
-      spinner.hidden = true;
+      loading.hidden = true;
+      status.classList.remove('is-loading');
       retry.hidden = false;
       status.textContent =
         'This photograph could not load. Try again or choose another photograph.';
@@ -130,7 +145,9 @@ function createLightbox(
             }
             finished = true;
             clearTimeout(timeout);
-            spinner.hidden = true;
+            clearTimeout(loadingDelay);
+            loading.hidden = true;
+            status.classList.remove('is-loading');
             retry.hidden = true;
             status.textContent = '';
             wrap.setAttribute('aria-busy', 'false');
@@ -144,18 +161,30 @@ function createLightbox(
       signal: controller.signal,
       once: true,
     });
-    image.sizes = '(max-width: 640px) calc(100vw - 32px), 90vw';
+    image.sizes = `(max-aspect-ratio: ${photo.width}/${photo.height}) calc(100vw - 16px), calc((100dvh - 16px) * ${photo.width / photo.height})`;
     image.srcset = srcset(photo);
     image.src = photo.variants.at(-1)!.url;
-    wrap.replaceChildren(image);
+    wrap.replaceChildren(loading, image);
+    // Fast cache hits and decodes finish before any loading affordance appears.
+    loadingDelay = setTimeout(() => {
+      if (active()) {
+        loading.hidden = false;
+        status.classList.add('is-loading');
+        status.textContent = 'Loading photograph…';
+      }
+    }, 180);
     timeout = setTimeout(fail, 20000);
     cancelImage = () => {
       ++sequence;
       clearTimeout(timeout);
+      clearTimeout(loadingDelay);
       controller.abort();
       image.removeAttribute('srcset');
       image.removeAttribute('src');
-      wrap.replaceChildren();
+      loading.hidden = true;
+      preview.style.backgroundImage = '';
+      status.textContent = '';
+      wrap.replaceChildren(loading);
     };
   }
   retry.addEventListener('click', () => show(index), { signal });
