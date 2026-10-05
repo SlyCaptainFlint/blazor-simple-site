@@ -311,7 +311,8 @@ test('slow image response remains concealed until loaded, including a repeated o
       });
     },
   );
-  await page.goto('/photography');
+  // The gated eager preview may hold the load event until release().
+  await page.goto('/photography', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.photo-open')).toHaveCount(50);
   await page.locator('.photo-open').first().click();
   await expect(page.locator('.lightbox-loading')).toBeVisible();
