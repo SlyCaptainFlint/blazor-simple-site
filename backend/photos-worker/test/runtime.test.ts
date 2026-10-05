@@ -24,6 +24,10 @@ test('real workerd runtime serves gallery and transform requests without unsuppo
     const resized=await mf.dispatchFetch('https://fixture.test/api/photos/123/1920.jpg');
     assert.equal(resized.status,200);assert.equal(await resized.text(),'fixture image response');
     assert.equal(resized.headers.get('Content-Type'),'image/jpeg');
+    const direct=await mf.dispatchFetch('https://fixture.test/api/photos/source-v1/123.jpg');
+    assert.equal(direct.status,200);assert.equal(await direct.text(),'fixture image response');
+    assert.equal(direct.headers.get('X-Photo-Mode'),'source-v1');
+    assert.match(direct.headers.get('Server-Timing')!, /gallery;dur=\d+, upstream;dur=\d+/);
     imageStatus=302;
     const rejected=await mf.dispatchFetch('https://fixture.test/api/photos/123/320.jpg');
     assert.equal(rejected.status,502);assert.equal(rejected.headers.get('X-Photo-Diagnostic'),'image_http_302');

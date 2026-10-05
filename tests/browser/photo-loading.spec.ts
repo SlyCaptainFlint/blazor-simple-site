@@ -492,3 +492,55 @@ test('a real browser cache hit does not flash the loading affordance', async ({
     );
   }
 });
+
+test('source diagnostic mode keeps thumbnails separate and streams a versioned full-size image', async ({
+  page,
+}) => {
+  const fullSizeUrl = '/api/photos/source-v1/1000.jpg';
+  await page.route('**/api/photos', (route) =>
+    route.fulfill({
+      json: { photos: [{ ...photos[0], fullSizeUrl }] },
+    }),
+  );
+  let sourceRequests = 0;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/photos/source-v1/1000.jpg', async (route) => {
+    sourceRequests++;
+    await pending;
+    await route.fulfill({ body: image, contentType: 'image/png' });
+  });
+  await page.goto('/photography');
+  await expect(page.locator('.photo-open img')).toBeVisible();
+  expect(sourceRequests).toBe(0);
+  await page.locator('.photo-open').click();
+  await expect(page.locator('.lightbox-loading')).toBeVisible();
+  await expect(page.locator('.lightbox-image')).toHaveAttribute(
+    'src',
+    fullSizeUrl,
+  );
+  await expect(page.locator('.lightbox-image')).not.toHaveAttribute('srcset');
+  release();
+  await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
+  expect(sourceRequests).toBe(1);
+});
+
+test('source diagnostic mode rejects unapproved full-size URLs', async ({
+  page,
+}) => {
+  for (const fullSizeUrl of [
+    'https://evil.example/api/photos/source-v1/1000.jpg',
+    'http://user:password@127.0.0.1:4173/api/photos/source-v1/1000.jpg',
+    '/api/photos/source-v1/999.jpg',
+    '/api/photos/source-v1/1000.jpg?url=evil',
+  ]) {
+    await page.route('**/api/photos', (route) =>
+      route.fulfill({ json: { photos: [{ ...photos[0], fullSizeUrl }] } }),
+    );
+    await page.goto('/photography');
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    await expect(page.locator('.photo-open')).toHaveCount(0);
+  }
+});
