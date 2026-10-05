@@ -145,17 +145,19 @@ for (const connection of [
 test('client cache expires with server fetchedAt, not an additional hour', async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const now = Date.now.bind(Date);
+  const initialTime = Date.now();
+  await page.addInitScript((initialTime) => {
     (window as any).timeOffset = 0;
-    Date.now = () => now() + (window as any).timeOffset;
-  });
+    Date.now = () => initialTime + (window as any).timeOffset;
+  }, initialTime);
   let count = 0;
   await page.route('**/api/photos', (route) => {
     count++;
     return route.fulfill({
       json: {
-        fetchedAt: new Date(Date.now() - 3599000).toISOString(),
+        fetchedAt: new Date(
+          count === 1 ? initialTime - 3599000 : initialTime + 2000,
+        ).toISOString(),
         photos: count === 1 ? photos : photos.slice(1),
       },
     });
