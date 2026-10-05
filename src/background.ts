@@ -7,6 +7,7 @@ interface Cell {
   x: number;
   y: number;
   tone: number;
+  roughness: number;
   opacity: string;
   position: string;
   scale: string;
@@ -36,42 +37,48 @@ export function startBackground(): void {
       (Math.min(elapsed, INTRO_MS) +
         Math.max(0, elapsed - INTRO_MS) * AMBIENT_SPEED) /
       1000;
-    const reveal = elapsed / INTRO_MS;
-    // Broad pools retain the original purple/lavender clustered palette.
-    const pools = [
-      [
-        0.24 + 0.14 * Math.sin(time * 0.18),
-        0.68 + 0.18 * Math.cos(time * 0.13),
-      ],
-      [
-        0.76 + 0.13 * Math.cos(time * 0.14),
-        0.63 + 0.23 * Math.sin(time * 0.16),
-      ],
-      [
-        0.52 + 0.28 * Math.sin(time * 0.09),
-        0.18 + 0.12 * Math.cos(time * 0.12),
-      ],
-    ];
+    const reveal = clamp(elapsed / INTRO_MS);
+    const ambientBlend = smooth((reveal - 0.75) / 0.25);
+    // Independently drifting, swelling ellipses overlap into irregular islands.
+    // Different phases and axes avoid a repeating wave across the whole field.
+    const islands = [
+      [0.18, 0.2, 0.24, 0.28, 0.13, 0.17, 0.2],
+      [0.76, 0.32, 0.24, 0.23, 0.16, 0.11, 1.8],
+      [0.43, 0.56, 0.24, 0.29, 0.12, 0.15, 3.4],
+      [0.14, 0.84, 0.24, 0.27, 0.17, 0.13, 4.6],
+      [0.82, 0.79, 0.25, 0.28, 0.11, 0.19, 5.8],
+    ].map(([x, y, width, height, speedX, speedY, phase]) => {
+      const angle = Math.sin(time * speedY + phase) * 0.5;
+      const swell = 1 + Math.sin(time * 0.21 + phase) * 0.09;
+      return {
+        x: x + Math.sin(time * speedX + phase) * 0.09,
+        y: y + Math.cos(time * speedY + phase) * 0.08,
+        width: width * swell,
+        height: height / swell,
+        cos: Math.cos(angle),
+        sin: Math.sin(angle),
+      };
+    });
     for (const cell of cells) {
-      let light = 0;
-      for (const [x, y] of pools) {
+      let ambientLight = 0;
+      for (const island of islands) {
+        const dx = cell.x - island.x;
+        const dy = cell.y - island.y;
         const distance =
-          ((cell.x - x) / 0.35) ** 2 + ((cell.y - y) / 0.45) ** 2;
-        light = Math.max(light, Math.max(0, 1 - distance));
+          ((dx * island.cos + dy * island.sin) / island.width) ** 2 +
+          ((dy * island.cos - dx * island.sin) / island.height) ** 2 +
+          cell.roughness;
+        ambientLight = Math.max(ambientLight, smooth((1 - distance) / 0.8));
       }
-      const sweep = smooth(
-        (reveal * 1.65 - (1 - cell.y) * 0.65 - Math.abs(cell.x - 0.5) * 0.3) /
-          0.3,
-      );
-      // Two waves across the viewport keep roughly three quarters of the field
-      // transitioning. The quiet part of each cycle is truly transparent.
-      const phase =
-        cell.x * Math.PI * 4 +
-        cell.y * Math.PI * 2 +
-        time * 0.32 +
-        Math.sin(cell.y * Math.PI * 2 + time * 0.12) * 0.65;
-      const breath = smooth((Math.cos(phase) + 0.7) / 1.7);
-      const brightness = breath * (0.65 + light * 0.35) * sweep;
+      // A narrow, rough inverted V travels upwards, then dissolves into islands.
+      const ridge =
+        1.15 -
+        reveal * 1.7 +
+        Math.abs(cell.x - 0.5) * 0.9 +
+        cell.roughness * 0.4;
+      const introLight = smooth(1 - ((cell.y - ridge) / 0.15) ** 2);
+      const brightness =
+        introLight * (1 - ambientBlend) + ambientLight * ambientBlend;
       const opacity = (brightness * (0.58 + cell.tone * 0.22)).toFixed(2);
       // Size and light share one envelope: 80% when dark, 100% at full light.
       const scale = (0.8 + brightness * 0.2).toFixed(3);
@@ -126,6 +133,11 @@ export function startBackground(): void {
           x: x / width,
           y: y / height,
           tone,
+          roughness:
+            (tone - 0.5) * 0.09 +
+            Math.sin((x / width) * 17 + (y / height) * 11) *
+              Math.sin((y / height) * 19 - (x / width) * 7) *
+              0.08,
           position,
           opacity: '',
           scale: '',

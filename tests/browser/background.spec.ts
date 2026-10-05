@@ -6,10 +6,12 @@ test('breathing follows brightness, has a dark rest, and covers most of the fiel
   await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ json: { photos: [] } }),
   );
-  await page.clock.install();
+  await page.clock.install({ time: new Date('2026-10-05T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-10-05T00:00:01Z'));
   await page.goto('/about');
   const svg = page.locator('#background-hexagons');
   let previous: { opacity: number; scale: number }[] = [];
+  const coverage: number[] = [];
   let smallest = 1;
   let largest = 0;
   for (let sample = 0; sample < 16; sample++) {
@@ -32,8 +34,10 @@ test('breathing follows brightness, has a dark rest, and covers most of the fiel
     );
     const visibleField = cells.filter((cell) => cell.inViewport);
     const active = visibleField.filter((cell) => cell.opacity > 0);
-    expect(active.length / visibleField.length).toBeGreaterThan(0.6);
-    expect(active.length / visibleField.length).toBeLessThan(0.8);
+    coverage.push(active.length / visibleField.length);
+    // Natural islands can merge and separate; coverage is approximate over time.
+    expect(active.length / visibleField.length).toBeGreaterThan(0.5);
+    expect(active.length / visibleField.length).toBeLessThan(0.9);
     expect(
       cells.some((cell) => cell.opacity === 0 && cell.scale <= 0.802),
     ).toBe(true);
@@ -53,6 +57,59 @@ test('breathing follows brightness, has a dark rest, and covers most of the fiel
     }
     previous = cells;
   }
+  const meanCoverage =
+    coverage.reduce((total, value) => total + value, 0) / coverage.length;
+  expect(meanCoverage).toBeGreaterThan(0.6);
+  expect(meanCoverage).toBeLessThan(0.8);
   expect(smallest).toBeLessThanOrEqual(0.802);
   expect(largest).toBeGreaterThan(0.98);
+});
+
+test('intro is an inverted V that travels upward before ambient islands', async ({
+  page,
+}) => {
+  await page.route('**/api/photos/renditions-v1', (route) =>
+    route.fulfill({ json: { photos: [] } }),
+  );
+  await page.clock.install({ time: new Date('2026-10-05T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-10-05T00:00:01Z'));
+  await page.goto('/');
+  const sample = () =>
+    page.locator('polygon').evaluateAll((nodes) => {
+      const cells = nodes
+        .map((element) => {
+          const node = element as SVGPolygonElement;
+          const position = node.transform.baseVal.getItem(0).matrix;
+          return {
+            x: position.e / innerWidth,
+            y: position.f / innerHeight,
+            light: Number(node.getAttribute('opacity')),
+          };
+        })
+        .filter(
+          (cell) => cell.x >= 0 && cell.x <= 1 && cell.y >= 0 && cell.y <= 1,
+        );
+      const meanY = (values: typeof cells) =>
+        values.reduce((sum, cell) => sum + cell.y * cell.light, 0) /
+        values.reduce((sum, cell) => sum + cell.light, 0);
+      return {
+        center: meanY(cells.filter((cell) => Math.abs(cell.x - 0.5) < 0.15)),
+        arms: meanY(cells.filter((cell) => Math.abs(cell.x - 0.5) > 0.3)),
+      };
+    });
+  await page.clock.runFor(950);
+  const first = await sample();
+  expect(first.arms - first.center).toBeGreaterThan(0.12);
+  await page.clock.runFor(500);
+  const later = await sample();
+  expect(first.center - later.center).toBeGreaterThan(0.15);
+  await expect(page.locator('#background-hexagons')).toHaveAttribute(
+    'data-phase',
+    'intro',
+  );
+  await page.clock.runFor(1400);
+  await expect(page.locator('#background-hexagons')).toHaveAttribute(
+    'data-phase',
+    'ambient',
+  );
 });
