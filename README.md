@@ -2,9 +2,9 @@
 
 A personal website built with TypeScript and Vite, served by Cloudflare Workers. It includes Home (`/`), About (`/about`), and Photography (`/photography`) pages. The photography gallery shows up to 50 recent public Flickr photos with responsive images and a keyboard-accessible lightbox.
 
-Gallery metadata begins loading during idle time on the initial page. On unconstrained connections, up to four responsive previews (at most 640 pixels wide) warm sequentially after page load and are reused when opening Photography. Metadata and these previews remain in memory only until the server metadata expires; full-size lightbox images load on demand and fade in after decoding. Loads longer than 180 ms show a blurred preview with a shimmer (static with reduced motion). Images fit the viewport with overlay navigation controls. Successful photo responses can also be cached by the browser until the server metadata expires, for up to one hour.
+Gallery metadata begins loading during idle time on the initial page. On unconstrained connections, up to four responsive Flickr previews warm sequentially after page load and are reused when opening Photography. Metadata and these previews remain in memory only until the server metadata expires; full-size lightbox images load on demand and fade in after decoding. Loads longer than 180 ms show a blurred preview with a shimmer (static with reduced motion). Images fit the viewport with overlay navigation controls. Successful photo responses can also be cached by the browser until the server metadata expires, for up to one hour.
 
-The lightbox currently uses an untransformed Flickr source for a fetch-latency diagnostic; gallery thumbnails remain resized. See the [Worker measurement instructions](backend/photos-worker/README.md#measure-image-request-latency) for timing headers, logs, comparisons, and restoring resized delivery.
+Gallery and lightbox images use available Flickr renditions through the same-origin Worker. The browser chooses a size using actual image dimensions and display density; square previews account for cropping. The Worker streams the selected image without resizing or recompression. See the [Worker measurement instructions](backend/photos-worker/README.md#measure-image-request-latency) for timing headers and logs.
 
 The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts and the portrait are served locally. The programmatic SVG background uses one shell-owned active-time clock: a 2.6-second home reveal followed by slowly drifting purple light clusters. Route navigation never restarts it. Geometry adapts on resize, opacity updates are capped at 30 Hz, and hidden tabs stop requesting frames. Reduced motion starts with a static field; the existing play control allows an explicit opt-in.
 
@@ -38,9 +38,9 @@ Open `http://127.0.0.1:8787`. For local Flickr access, create an ignored `.dev.v
 FLICKR_API_KEY=your_flickr_api_key
 ```
 
-Without this secret, the local site loads but the photo API returns `503`. Actual image transformations require Cloudflare's deployed service. See the [Worker README](backend/photos-worker/README.md) for backend-only development, API details, and diagnostics.
+Without this secret, the local site loads but the photo API returns `503`. See the [Worker README](backend/photos-worker/README.md) for backend-only development, API details, and diagnostics.
 
-`VITE_PHOTOS_API_URL` optionally sets a different photo API endpoint when starting Vite or building the site. Leave it unset for the combined deployment, which uses `/api/photos`. Never put secrets in `VITE_*` variables or frontend files.
+`VITE_PHOTOS_API_URL` optionally sets a different photo API endpoint when starting Vite or building the site. Leave it unset for the combined deployment, which uses `/api/photos/renditions-v1`. Never put secrets in `VITE_*` variables or frontend files.
 
 ## Source layout
 
@@ -55,7 +55,7 @@ Without this secret, the local site loads but the photo API returns `503`. Actua
 | `src/background.ts` | Responsive SVG hexagon field and shared animation clock. |
 | `src/style.css` | Site styles. |
 | `public/` | Static assets copied into the build. |
-| `backend/photos-worker/` | Flickr API and image transformation Worker. |
+| `backend/photos-worker/` | Flickr metadata and image proxy Worker. |
 | `tests/` | Browser and combined Worker/static-assets routing tests. |
 
 Vite imports HTML templates through `?raw` imports. TypeScript assigns dynamic photo text and attributes through DOM properties.
@@ -101,6 +101,6 @@ Configure **Settings → Environments → production** in GitHub:
 2. Allow deployments from the `master` branch only, with no allowed tags.
 3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token needs **Account → Workers Scripts → Edit**, scoped to the deployment account.
 
-Configure `FLICKR_API_KEY` as a secret on the Cloudflare Worker. The publishing workflow does not set or rotate it. The account must support Cloudflare image transformations.
+Configure `FLICKR_API_KEY` as a secret on the Cloudflare Worker. The publishing workflow does not set or rotate it.
 
 Once the workflow exists on the default branch, open **Actions → production publish → Run workflow**, select `master`, and approve the production environment deployment. The workflow checks out the selected commit, runs validation and a deployment dry-run, then publishes. Pushes and merges do not trigger publishing.

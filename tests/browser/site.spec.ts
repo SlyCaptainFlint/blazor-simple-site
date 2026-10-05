@@ -8,17 +8,25 @@ const photos = Array.from({ length: 50 }, (_, i) => ({
   title: `Photograph ${i + 1}`,
   width: 2048,
   height: 1365,
-  variants: [320, 640, 960, 1440, 1920].map((width) => ({
-    width,
-    url: `/api/photos/${1000 + i}/${width}.jpg`,
+  variants: [
+    ['n', 320],
+    ['z', 640],
+    ['l', 1024],
+    ['h', 1600],
+    ['k', 2048],
+  ].map(([size, width]) => ({
+    width: Number(width),
+    height: Math.round((Number(width) * 1365) / 2048),
+    url: `/api/photos/renditions-v1/${1000 + i}/${size}.jpg`,
   })),
 }));
 async function fixture(page: Page) {
-  await page.route('**/api/photos', (route) =>
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ json: { limit: 50, photos } }),
   );
-  await page.route(/\/api\/photos\/\d+\/\d+\.jpg$/, (route) =>
-    route.fulfill({ body: image, contentType: 'image/png' }),
+  await page.route(
+    /\/api\/photos\/renditions-v1\/\d+\/[smnzclhk]\.jpg$/,
+    (route) => route.fulfill({ body: image, contentType: 'image/png' }),
   );
 }
 test.beforeEach(async ({ page }) => {
@@ -169,8 +177,9 @@ test('phone resize, failed image and repeated gallery navigation remain usable',
         .evaluate((el) => el.getBoundingClientRect().width),
     )
     .toBeGreaterThan(width);
-  await page.route(/\/api\/photos\/1000\/\d+\.jpg$/, (route) =>
-    route.fulfill({ status: 502 }),
+  await page.route(
+    /\/api\/photos\/renditions-v1\/1000\/[smnzclhk]\.jpg$/,
+    (route) => route.fulfill({ status: 502 }),
   );
   await page.reload();
   await expect(page.locator('.photo-open').first()).toHaveClass(/image-failed/);
@@ -191,12 +200,12 @@ test('phone resize, failed image and repeated gallery navigation remain usable',
   }
 });
 test('empty, failure and retry states plus unknown route', async ({ page }) => {
-  await page.route('**/api/photos', (route) =>
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ status: 503, json: { error: 'service_not_configured' } }),
   );
   await page.goto('/photography');
   await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
-  await page.route('**/api/photos', (route) =>
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ json: { photos: [] } }),
   );
   await page.getByRole('button', { name: 'Try again' }).click();
@@ -235,7 +244,7 @@ test('reduced motion is static and permits explicit playback', async ({
 test('leaving a pending gallery cancels its work and leaves no stale dialog', async ({
   page,
 }) => {
-  await page.route('**/api/photos', async (route) => {
+  await page.route('**/api/photos/renditions-v1', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 500));
     await route.fulfill({ json: { photos } }).catch(() => {});
   });
@@ -289,7 +298,7 @@ test('photos have no corner links and lightbox shows only image and navigation c
     dialog.locator('figcaption, a, .lightbox-count, .lightbox-source'),
   ).toHaveCount(0);
   await expect(page.locator('.lightbox-status')).toHaveText('');
-  await expect(dialog).toHaveText('× ‹ ›', {useInnerText:true});
+  await expect(dialog).toHaveText('× ‹ ›', { useInnerText: true });
 });
 
 test('SVG resize and pause preserve active time and direct routes skip the intro', async ({

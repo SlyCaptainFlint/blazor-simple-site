@@ -9,22 +9,31 @@ const photos = Array.from({ length: 50 }, (_, i) => ({
   title: `Photograph ${i + 1}`,
   width: 2048,
   height: 1365,
-  variants: [320, 640, 960, 1440, 1920].map((width) => ({
-    width,
-    url: `/api/photos/${1000 + i}/${width}.jpg`,
+  variants: [
+    ['n', 320],
+    ['z', 640],
+    ['l', 1024],
+    ['h', 1600],
+    ['k', 2048],
+  ].map(([size, width]) => ({
+    width: Number(width),
+    height: Math.round((Number(width) * 1365) / 2048),
+    url: `/api/photos/renditions-v1/${1000 + i}/${size}.jpg`,
   })),
 }));
 
 async function fixture(page: Page) {
-  await page.route('**/api/photos', (route) =>
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ json: { fetchedAt: new Date().toISOString(), photos } }),
   );
-  await page.route(/\/api\/photos\/\d+\/\d+\.jpg$/, (route) =>
-    route.fulfill({
-      body: image,
-      contentType: 'image/png',
-      headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
-    }),
+  await page.route(
+    /\/api\/photos\/renditions-v1\/\d+\/[smnzclhk]\.jpg$/,
+    (route) =>
+      route.fulfill({
+        body: image,
+        contentType: 'image/png',
+        headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
+      }),
   );
   await page.addInitScript(() =>
     Object.defineProperty(navigator, 'connection', {
@@ -42,27 +51,31 @@ test('idle warmup is bounded and reuses preloaded preview nodes across routes', 
   let metadata = 0;
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname;
-    if (path === '/api/photos') metadata++;
-    if (/\/api\/photos\/\d+\/\d+\.jpg$/.test(path)) requests.push(path);
+    if (path === '/api/photos/renditions-v1') metadata++;
+    if (/\/api\/photos\/renditions-v1\/\d+\/[smnzclhk]\.jpg$/.test(path))
+      requests.push(path);
   });
   let active = 0;
   let peak = 0;
-  await page.route(/\/api\/photos\/\d+\/\d+\.jpg$/, async (route) => {
-    active++;
-    peak = Math.max(peak, active);
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await route.fulfill({
-      body: image,
-      contentType: 'image/png',
-      headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
-    });
-    active--;
-  });
+  await page.route(
+    /\/api\/photos\/renditions-v1\/\d+\/[smnzclhk]\.jpg$/,
+    async (route) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await route.fulfill({
+        body: image,
+        contentType: 'image/png',
+        headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
+      });
+      active--;
+    },
+  );
   await page.goto('/');
   await expect.poll(() => requests.length).toBe(4);
   await expect.poll(() => active).toBe(0);
   expect(peak).toBe(1);
-  expect(requests.every((path) => /\/(320|640)\.jpg$/.test(path))).toBe(true);
+  expect(requests.every((path) => path.includes('/renditions-v1/'))).toBe(true);
   await page.waitForTimeout(200);
   expect(requests.length).toBe(4);
   await page.getByRole('link', { name: 'Photography', exact: true }).click();
@@ -103,7 +116,7 @@ test('metadata preload is shared with navigation while still pending', async ({
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route('**/api/photos', async (route) => {
+  await page.route('**/api/photos/renditions-v1', async (route) => {
     count++;
     await gate;
     await route.fulfill({ json: { photos } });
@@ -153,7 +166,7 @@ test('client cache expires with server fetchedAt, not an additional hour', async
     Date.now = () => initialTime + (window as any).timeOffset;
   }, initialTime);
   let count = 0;
-  await page.route('**/api/photos', (route) => {
+  await page.route('**/api/photos/renditions-v1', (route) => {
     count++;
     return route.fulfill({
       json: {
@@ -256,10 +269,12 @@ test('lightbox errors offer retry; reduced motion reveals without animation', as
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   let fail = true;
-  await page.route(/\/api\/photos\/1000\/\d+\.jpg$/, (route) =>
-    fail
-      ? route.fulfill({ status: 502 })
-      : route.fulfill({ body: image, contentType: 'image/png' }),
+  await page.route(
+    /\/api\/photos\/renditions-v1\/1000\/[smnzclhk]\.jpg$/,
+    (route) =>
+      fail
+        ? route.fulfill({ status: 502 })
+        : route.fulfill({ body: image, contentType: 'image/png' }),
   );
   await page.goto('/photography');
   await page.locator('.photo-open').first().click();
@@ -281,20 +296,23 @@ test('lightbox errors offer retry; reduced motion reveals without animation', as
 test('slow image response remains concealed until loaded, including a repeated open', async ({
   page,
 }) => {
-  await page.goto('/photography');
-  await expect(page.locator('.photo-open')).toHaveCount(50);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route(/\/api\/photos\/1000\/\d+\.jpg$/, async (route) => {
-    await gate;
-    await route.fulfill({
-      body: image,
-      contentType: 'image/png',
-      headers: { 'Cache-Control': 'public, max-age=60' },
-    });
-  });
+  await page.route(
+    /\/api\/photos\/renditions-v1\/1000\/[smnzclhk]\.jpg$/,
+    async (route) => {
+      await gate;
+      await route.fulfill({
+        body: image,
+        contentType: 'image/png',
+        headers: { 'Cache-Control': 'public, max-age=60' },
+      });
+    },
+  );
+  await page.goto('/photography');
+  await expect(page.locator('.photo-open')).toHaveCount(50);
   await page.locator('.photo-open').first().click();
   await expect(page.locator('.lightbox-loading')).toBeVisible();
   await expect(page.locator('.lightbox-image')).toHaveCSS(
@@ -358,14 +376,16 @@ test('portrait and landscape photos maximize space with controls over the image'
     { ...photos[0], width: 640, height: 426 },
     { ...photos[1], width: 426, height: 640 },
   ];
-  await page.route('**/api/photos', (route) =>
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({ json: { photos: shapedPhotos } }),
   );
-  await page.route(/\/api\/photos\/1001\/\d+\.jpg$/, (route) =>
-    route.fulfill({
-      contentType: 'image/svg+xml',
-      body: '<svg xmlns="http://www.w3.org/2000/svg" width="426" height="640"><rect width="426" height="640" fill="purple"/></svg>',
-    }),
+  await page.route(
+    /\/api\/photos\/renditions-v1\/1001\/[smnzclhk]\.jpg$/,
+    (route) =>
+      route.fulfill({
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="426" height="640"><rect width="426" height="640" fill="purple"/></svg>',
+      }),
   );
   await page.goto('/photography');
   await page.locator('.photo-open').first().click();
@@ -418,7 +438,7 @@ test('a real browser cache hit does not flash the loading affordance', async ({
   const requests = new Map<string, number>();
   const server = createServer((request, response) => {
     const path = new URL(request.url!, 'http://localhost').pathname;
-    if (path === '/api/photos') {
+    if (path === '/api/photos/renditions-v1') {
       response.setHeader('Content-Type', 'application/json');
       response.end(JSON.stringify({ photos: photos.slice(0, 1) }));
     } else if (path.startsWith('/api/photos/')) {
@@ -493,54 +513,79 @@ test('a real browser cache hit does not flash the loading affordance', async ({
   }
 });
 
-test('source diagnostic mode keeps thumbnails separate and streams a versioned full-size image', async ({
+test('a single available portrait rendition serves preview and lightbox with its actual width', async ({
   page,
 }) => {
-  const fullSizeUrl = '/api/photos/source-v1/1000.jpg';
-  await page.route('**/api/photos', (route) =>
+  const variant = {
+    url: '/api/photos/renditions-v1/1000/z.jpg',
+    width: 426,
+    height: 640,
+  };
+  await page.route('**/api/photos/renditions-v1', (route) =>
     route.fulfill({
-      json: { photos: [{ ...photos[0], fullSizeUrl }] },
+      json: {
+        photos: [
+          { ...photos[0], width: 426, height: 640, variants: [variant] },
+        ],
+      },
     }),
   );
-  let sourceRequests = 0;
-  let release!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route('**/api/photos/source-v1/1000.jpg', async (route) => {
-    sourceRequests++;
-    await pending;
-    await route.fulfill({ body: image, contentType: 'image/png' });
-  });
   await page.goto('/photography');
-  await expect(page.locator('.photo-open img')).toBeVisible();
-  expect(sourceRequests).toBe(0);
-  await page.locator('.photo-open').click();
-  await expect(page.locator('.lightbox-loading')).toBeVisible();
-  await expect(page.locator('.lightbox-image')).toHaveAttribute(
-    'src',
-    fullSizeUrl,
+  await expect(page.locator('.photo-open img')).toHaveAttribute(
+    'srcset',
+    `${variant.url} 426w`,
   );
-  await expect(page.locator('.lightbox-image')).not.toHaveAttribute('srcset');
-  release();
+  await page.locator('.photo-open').click();
   await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
-  expect(sourceRequests).toBe(1);
+  await expect(page.locator('.lightbox-image')).toHaveAttribute(
+    'srcset',
+    `${variant.url} 426w`,
+  );
+  expect(
+    await page
+      .locator('.lightbox-image')
+      .evaluate((img: HTMLImageElement) => new URL(img.currentSrc).pathname),
+  ).toBe(variant.url);
 });
 
-test('source diagnostic mode rejects unapproved full-size URLs', async ({
-  page,
-}) => {
-  for (const fullSizeUrl of [
-    'https://evil.example/api/photos/source-v1/1000.jpg',
-    'http://user:password@127.0.0.1:4173/api/photos/source-v1/1000.jpg',
-    '/api/photos/source-v1/999.jpg',
-    '/api/photos/source-v1/1000.jpg?url=evil',
+test('rendition metadata rejects unapproved image URLs', async ({ page }) => {
+  for (const url of [
+    'https://evil.example/api/photos/renditions-v1/1000/z.jpg',
+    'http://user:password@127.0.0.1:4173/api/photos/renditions-v1/1000/z.jpg',
+    '/api/photos/renditions-v1/999/z.jpg',
+    '/api/photos/renditions-v1/1000/z.jpg?url=evil',
+    '/api/photos/renditions-v1/1000/o.jpg',
   ]) {
-    await page.route('**/api/photos', (route) =>
-      route.fulfill({ json: { photos: [{ ...photos[0], fullSizeUrl }] } }),
+    await page.route('**/api/photos/renditions-v1', (route) =>
+      route.fulfill({
+        json: {
+          photos: [
+            { ...photos[0], variants: [{ width: 640, height: 426, url }] },
+          ],
+        },
+      }),
     );
     await page.goto('/photography');
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.locator('.photo-open')).toHaveCount(0);
   }
+});
+
+test('square previews request enough landscape pixels for the crop and device density', async ({
+  page,
+}) => {
+  await page.goto('/photography');
+  const img = page.locator('.photo-open img').first();
+  await expect
+    .poll(() => img.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+  const measured = await img.evaluate((image: HTMLImageElement) => ({
+    path: new URL(image.currentSrc).pathname,
+    width: image.getBoundingClientRect().width,
+    dpr: devicePixelRatio,
+  }));
+  const selected = photos[0].variants.find((v) => v.url === measured.path)!;
+  const target =
+    (measured.width * measured.dpr * photos[0].width) / photos[0].height;
+  expect(selected.width).toBeGreaterThanOrEqual(Math.min(target, 2048));
 });
