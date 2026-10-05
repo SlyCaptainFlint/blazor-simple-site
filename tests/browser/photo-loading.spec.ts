@@ -21,7 +21,7 @@ async function fixture(page: Page) {
     route.fulfill({
       body: image,
       contentType: 'image/png',
-      headers: { 'Cache-Control': 'no-store' },
+      headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
     }),
   );
   await page.addInitScript(() =>
@@ -33,7 +33,7 @@ async function fixture(page: Page) {
 }
 test.beforeEach(async ({ page }) => fixture(page));
 
-test('idle warmup is bounded and reuses no-store preview nodes across routes', async ({
+test('idle warmup is bounded and reuses preloaded preview nodes across routes', async ({
   page,
 }) => {
   const requests: string[] = [];
@@ -52,7 +52,7 @@ test('idle warmup is bounded and reuses no-store preview nodes across routes', a
     await route.fulfill({
       body: image,
       contentType: 'image/png',
-      headers: { 'Cache-Control': 'no-store' },
+      headers: { 'Cache-Control': 'private, max-age=3600, must-revalidate' },
     });
     active--;
   });

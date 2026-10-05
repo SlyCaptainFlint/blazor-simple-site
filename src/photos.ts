@@ -148,7 +148,7 @@ const PREVIEW_LIMIT = 4;
 const PREVIEW_SIZES =
   '(max-width: 640px) calc((100vw - 24px) / 2), (max-width: 960px) calc((100vw - 48px) / 2), (max-width: 1280px) calc((100vw - 48px) / 3), 350px';
 
-/** Reuse the actual image node: no-store responses cannot be warmed via HTTP cache. */
+/** Reuse a preloaded image so the gallery can display it immediately. */
 export function previewImage(photo: Photo, index: number): HTMLImageElement {
   const existing = previews.get(photo.id);
   if (existing) {

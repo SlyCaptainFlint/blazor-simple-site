@@ -327,9 +327,11 @@ export function createHandler(dependencies: Dependencies) {
       'X-Content-Type-Options': 'nosniff',
     });
     const origin = request.headers.get('Origin');
+    if (env.ALLOWED_ORIGIN) {
+      headers.set('Vary', 'Origin');
+    }
     if (origin && origin === env.ALLOWED_ORIGIN) {
       headers.set('Access-Control-Allow-Origin', origin);
-      headers.set('Vary', 'Origin');
     }
     function json(body: unknown, status = 200): Response {
       const responseHeaders = new Headers(headers);
@@ -386,7 +388,7 @@ export function createHandler(dependencies: Dependencies) {
         return json({ error: 'photo_not_found' }, 404);
       }
       const source = photo.sources[0];
-      // Recheck membership on every request, even if Cloudflare has cached the underlying transform.
+      // Requests that reach the Worker check membership before using a cached transform.
       let resized: Response;
       const signal = AbortSignal.timeout(15000);
       try {
@@ -456,6 +458,21 @@ export function createHandler(dependencies: Dependencies) {
           ...(resizeCode === undefined ? {} : { resizeCode }),
         });
       }
+      // Browser copies expire with the gallery metadata used to approve this photo.
+      const remainingSeconds = Math.max(
+        0,
+        Math.min(
+          TTL,
+          Math.floor(
+            (Date.parse(data.fetchedAt) + TTL * 1000 - dependencies.now()) /
+              1000,
+          ),
+        ),
+      );
+      headers.set(
+        'Cache-Control',
+        `private, max-age=${remainingSeconds}, must-revalidate`,
+      );
       headers.set('Content-Type', contentType!);
       return new Response(resized.body, { headers });
     } catch (e) {

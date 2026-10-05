@@ -2,7 +2,7 @@
 
 A personal website built with TypeScript and Vite, served by Cloudflare Workers. It includes Home (`/`), About (`/about`), and Photography (`/photography`) pages. The photography gallery shows up to 50 recent public Flickr photos with responsive images and a keyboard-accessible lightbox.
 
-Gallery metadata begins loading during idle time on the initial page. On unconstrained connections, up to four responsive previews (at most 640 pixels wide) warm sequentially after page load and are reused when opening Photography. Metadata and these previews remain in memory only until the server metadata expires; full-size lightbox images load on demand and fade in after decoding.
+Gallery metadata begins loading during idle time on the initial page. On unconstrained connections, up to four responsive previews (at most 640 pixels wide) warm sequentially after page load and are reused when opening Photography. Metadata and these previews remain in memory only until the server metadata expires; full-size lightbox images load on demand and fade in after decoding. Successful photo responses can also be cached by the browser until the server metadata expires, for up to one hour.
 
 The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts, the portrait, and background assets are served locally.
 
