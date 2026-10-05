@@ -82,7 +82,7 @@ test('real workerd runtime serves gallery and rendition requests without unsuppo
     assert.equal(rejected.status, 502);
     assert.equal(rejected.headers.get('X-Photo-Diagnostic'), 'image_http_302');
     assert.equal(
-      calls.some((call) => call.url.startsWith('https://untrusted.invalid')),
+      calls.some((call) => new URL(call.url).hostname === 'untrusted.invalid'),
       false,
     );
   } finally {

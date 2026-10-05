@@ -155,18 +155,26 @@ export function srcset(photo: Photo): string {
 
 const PREVIEW_LIMIT = 4;
 /** Account for the extra image width hidden by the square gallery crop. */
-function previewSizes(photo: Photo): string {
+function previewSizes(photo: Photo, photoCount: number): string {
   const crop = Math.max(1, photo.width / photo.height);
+  // Match the gallery's 4px gaps, main padding, and auto-fit columns.
+  const columns = (count: number) => Math.min(photoCount, count);
+  const slot = (count: number, viewport: string) =>
+    `calc((${viewport} - ${64 + 4 * (count - 1)}px) / ${count} * ${crop})`;
   return [
-    `(max-width: 640px) calc((100vw - 24px) / 2 * ${crop})`,
-    `(max-width: 960px) calc((100vw - 48px) / 2 * ${crop})`,
-    `(max-width: 1280px) calc((100vw - 48px) / 3 * ${crop})`,
-    `${350 * crop}px`,
+    `(max-width: 640px) calc((100vw - 28px) / 2 * ${crop})`,
+    `(max-width: 960px) calc((100vw - 68px) / 2 * ${crop})`,
+    `(max-width: 1195px) ${slot(columns(3), '100vw')}`,
+    slot(columns(4), 'min(100vw, 1440px)'),
   ].join(', ');
 }
 
 /** Reuse a preloaded image so the gallery can display it immediately. */
-export function previewImage(photo: Photo, index: number): HTMLImageElement {
+export function previewImage(
+  photo: Photo,
+  index: number,
+  photoCount: number,
+): HTMLImageElement {
   const existing = previews.get(photo.id);
   if (existing) {
     return existing;
@@ -178,7 +186,7 @@ export function previewImage(photo: Photo, index: number): HTMLImageElement {
   image.decoding = 'async';
   image.loading = index < PREVIEW_LIMIT ? 'eager' : 'lazy';
   image.fetchPriority = 'low';
-  image.sizes = previewSizes(photo);
+  image.sizes = previewSizes(photo, photoCount);
   image.srcset = srcset(photo);
   image.src = photo.variants[0].url;
   if (index < PREVIEW_LIMIT) {
@@ -237,7 +245,7 @@ export function startPhotoPreload(): void {
       ) {
         return;
       }
-      const image = previewImage(photo, index);
+      const image = previewImage(photo, index, photos.length);
       // One speculative transfer at a time; failures must not affect the page.
       try {
         await image.decode();

@@ -32,7 +32,7 @@ export async function renderGallery(
         'aria-label',
         `Open ${photo.title || `photograph ${index + 1}`}`,
       );
-      const image = previewImage(photo, index);
+      const image = previewImage(photo, index, photos.length);
       image.fetchPriority = 'auto';
       card.querySelector('img')!.replaceWith(image);
       if (image.complete && image.naturalWidth) {

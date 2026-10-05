@@ -589,3 +589,29 @@ test('square previews request enough landscape pixels for the crop and device de
     (measured.width * measured.dpr * photos[0].width) / photos[0].height;
   expect(selected.width).toBeGreaterThanOrEqual(Math.min(target, 2048));
 });
+
+test('a short gallery supplies enough pixels when auto-fit expands its columns', async ({
+  page,
+}) => {
+  await page.route('**/api/photos/renditions-v1', (route) =>
+    route.fulfill({ json: { photos: photos.slice(0, 2) } }),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/photography');
+  const img = page.locator('.photo-open img').first();
+  await expect
+    .poll(() => img.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
+  const measured = await img.evaluate((image: HTMLImageElement) => ({
+    path: new URL(image.currentSrc).pathname,
+    width: image.getBoundingClientRect().width,
+    dpr: devicePixelRatio,
+  }));
+  const selected = photos[0].variants.find((v) => v.url === measured.path)!;
+  expect(selected.width).toBeGreaterThanOrEqual(
+    Math.min(
+      (measured.width * measured.dpr * photos[0].width) / photos[0].height,
+      2048,
+    ),
+  );
+});
