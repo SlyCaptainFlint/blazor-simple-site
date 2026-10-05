@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 
 const image = readFileSync(new URL('./fixtures/photo.png', import.meta.url));
@@ -304,4 +306,189 @@ test('slow image response remains concealed until loaded, including a repeated o
   await page.keyboard.press('Escape');
   await page.locator('.photo-open').first().click();
   await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
+});
+
+test('delayed shimmer uses the existing preview and stops with reduced motion', async ({
+  page,
+}) => {
+  await gateDecoding(page);
+  await page.goto('/photography');
+  const thumbnail = page.locator('.photo-open img').first();
+  await expect
+    .poll(() =>
+      thumbnail.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  const source = await thumbnail.evaluate(
+    (image: HTMLImageElement) => image.currentSrc,
+  );
+  await page.locator('.photo-open').first().click();
+  await expect(page.locator('.lightbox-loading')).toBeVisible();
+  expect(
+    await page
+      .locator('.lightbox-preview')
+      .evaluate((node) => getComputedStyle(node).backgroundImage),
+  ).toContain(source);
+  await expect(page.locator('.lightbox-preview')).toHaveCSS(
+    'filter',
+    'blur(12px)',
+  );
+  expect(
+    await page
+      .locator('.lightbox-loading')
+      .evaluate((node) => getComputedStyle(node, '::after').animationName),
+  ).toBe('photo-shimmer');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(
+    await page
+      .locator('.lightbox-loading')
+      .evaluate((node) => getComputedStyle(node, '::after').animationName),
+  ).toBe('none');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  await expect(page.locator('.lightbox-loading')).toBeHidden();
+});
+
+test('portrait and landscape photos maximize space with controls over the image', async ({
+  page,
+}) => {
+  const shapedPhotos = [
+    { ...photos[0], width: 640, height: 426 },
+    { ...photos[1], width: 426, height: 640 },
+  ];
+  await page.route('**/api/photos', (route) =>
+    route.fulfill({ json: { photos: shapedPhotos } }),
+  );
+  await page.route(/\/api\/photos\/1001\/\d+\.jpg$/, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="426" height="640"><rect width="426" height="640" fill="purple"/></svg>',
+    }),
+  );
+  await page.goto('/photography');
+  await page.locator('.photo-open').first().click();
+  const viewport = page.viewportSize()!;
+  for (const size of [
+    viewport,
+    { width: viewport.height, height: viewport.width },
+  ]) {
+    await page.setViewportSize(size);
+    for (const [index, photo] of shapedPhotos.entries()) {
+      if (index)
+        await page.getByRole('button', { name: 'Next photograph' }).click();
+      await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
+      const bounds = (await page.locator('.lightbox-image').boundingBox())!;
+      const expectedWidth = Math.min(
+        size.width - 16,
+        ((size.height - 16) * photo.width) / photo.height,
+      );
+      expect(Math.abs(bounds.width - expectedWidth)).toBeLessThan(2);
+      expect(
+        Math.abs(bounds.width / bounds.height - photo.width / photo.height),
+      ).toBeLessThan(0.01);
+      for (const control of [
+        '.lightbox-close',
+        '.lightbox-prev',
+        '.lightbox-next',
+      ]) {
+        const button = (await page.locator(control).boundingBox())!;
+        expect(button.width).toBeGreaterThanOrEqual(44);
+        expect(button.height).toBeGreaterThanOrEqual(44);
+        expect(button.x).toBeGreaterThanOrEqual(bounds.x);
+        expect(button.x + button.width).toBeLessThanOrEqual(
+          bounds.x + bounds.width + 1,
+        );
+        expect(button.y).toBeGreaterThanOrEqual(bounds.y);
+        expect(button.y + button.height).toBeLessThanOrEqual(
+          bounds.y + bounds.height + 1,
+        );
+      }
+    }
+    await page.getByRole('button', { name: 'Previous photograph' }).click();
+  }
+});
+
+test('a real browser cache hit does not flash the loading affordance', async ({
+  page,
+}) => {
+  // Playwright routing disables HTTP caching, so serve this case over real HTTP.
+  await page.unrouteAll();
+  const requests = new Map<string, number>();
+  const server = createServer((request, response) => {
+    const path = new URL(request.url!, 'http://localhost').pathname;
+    if (path === '/api/photos') {
+      response.setHeader('Content-Type', 'application/json');
+      response.end(JSON.stringify({ photos: photos.slice(0, 1) }));
+    } else if (path.startsWith('/api/photos/')) {
+      requests.set(path, (requests.get(path) ?? 0) + 1);
+      response.setHeader('Content-Type', 'image/png');
+      response.setHeader('Cache-Control', 'private, max-age=3600');
+      response.end(image);
+    } else {
+      const asset = path.startsWith('/assets/') ? path : '/index.html';
+      const type = asset.endsWith('.js')
+        ? 'text/javascript'
+        : asset.endsWith('.css')
+          ? 'text/css'
+          : asset.endsWith('.woff2')
+            ? 'font/woff2'
+            : asset.endsWith('.woff')
+              ? 'font/woff'
+              : 'text/html';
+      response.setHeader('Content-Type', type);
+      response.end(
+        readFileSync(new URL(`../../dist${asset}`, import.meta.url)),
+      );
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address() as AddressInfo;
+    await page.goto(`http://127.0.0.1:${address.port}/photography`);
+    await page.locator('.photo-open').first().click();
+    await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
+    const source = await page
+      .locator('.lightbox-image')
+      .evaluate(
+        (image: HTMLImageElement) => new URL(image.currentSrc).pathname,
+      );
+    const initialRequests = requests.get(source);
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => {
+      (window as any).loaderFlashed = false;
+      const loader = document.querySelector<HTMLElement>('.lightbox-loading')!;
+      new MutationObserver((records) => {
+        if (
+          records.some(
+            (record) =>
+              record.attributeName === 'hidden' && record.oldValue === null,
+          )
+        ) {
+          (window as any).loaderFlashed = true;
+        }
+        if (!loader.hidden) (window as any).loaderFlashed = true;
+      }).observe(loader, {
+        attributes: true,
+        attributeOldValue: true,
+        attributeFilter: ['hidden'],
+      });
+    });
+    for (let i = 0; i < 3; i++) {
+      await page.locator('.photo-open').first().click();
+      await expect(page.locator('.lightbox-image')).toHaveClass(/is-ready/);
+      await page.waitForTimeout(250);
+      await page.keyboard.press('Escape');
+    }
+    expect(requests.get(source)).toBe(initialRequests);
+    expect(await page.evaluate(() => (window as any).loaderFlashed)).toBe(
+      false,
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  }
 });

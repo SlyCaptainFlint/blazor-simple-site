@@ -1,6 +1,7 @@
 const NS = 'http://www.w3.org/2000/svg';
 const INTRO_MS = 2600;
 const FRAME_MS = 1000 / 30;
+const AMBIENT_SPEED = 2;
 interface Cell {
   node: SVGPolygonElement;
   x: number;
@@ -28,7 +29,11 @@ export function startBackground(): void {
   let cells: Cell[] = [];
 
   function paint(): void {
-    const time = elapsed / 1000;
+    // Keep the intro unchanged, then move the light pools twice as quickly.
+    const time =
+      (Math.min(elapsed, INTRO_MS) +
+        Math.max(0, elapsed - INTRO_MS) * AMBIENT_SPEED) /
+      1000;
     const reveal = elapsed / INTRO_MS;
     // Three broad, slowly drifting pools light neighboring cells without filters.
     const pools = [
