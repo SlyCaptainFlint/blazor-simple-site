@@ -14,7 +14,7 @@ jobs:
     # Check both the original initiator and the person requesting a rerun.
     if: >-
       github.repository == 'SlyCaptainFlint/blazor-simple-site' &&
-      (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/feat/')) &&
+      startsWith(github.ref, 'refs/heads/') &&
       github.actor == 'SlyCaptainFlint' &&
       github.triggering_actor == 'SlyCaptainFlint'
     runs-on: ubuntu-latest
