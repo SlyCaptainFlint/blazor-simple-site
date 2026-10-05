@@ -2,15 +2,16 @@ export interface Env {
   FLICKR_API_KEY?: string;
   /** Optional exact frontend origin, e.g. https://example.com. Empty = same origin only. */
   ALLOWED_ORIGIN?: string;
-  /** Use the untransformed Flickr source for diagnostic lightbox requests. */
-  PHOTO_LIGHTBOX_MODE?: 'source-v1' | 'resized';
 }
 
 const USER_ID = '93665003@N05';
-const WIDTHS = [320, 640, 960, 1440, 1920] as const;
+const RENDITIONS = ['s', 'm', 'n', 'z', 'c', 'l', 'h', 'k'] as const;
+type Rendition = (typeof RENDITIONS)[number];
+const LEGACY_WIDTHS = [320, 640, 960, 1440, 1920] as const;
 const LIMIT = 50;
 const TTL = 60 * 60;
 interface Source {
+  rendition: Rendition;
   url: string;
   width: number;
   height: number;
@@ -41,7 +42,7 @@ type GalleryCacheState = 'hit' | 'miss' | 'shared';
 interface ImageTiming {
   event: 'photo_request_timing';
   requestId: string;
-  mode: 'source-v1' | 'resized';
+  mode: 'rendition' | 'legacy';
   galleryCache: GalleryCacheState;
   galleryMs: number;
   upstreamMs?: number;
@@ -73,12 +74,9 @@ interface Diagnostic {
     | 'image_timeout'
     | 'image_http'
     | 'image_redirect'
-    | 'image_transform'
-    | 'image_untransformed'
     | 'image_format';
   upstreamStatus?: number;
   flickrCode?: number;
-  resizeCode?: number;
 }
 
 class ServiceError extends Error {
@@ -213,7 +211,7 @@ export function normalize(payload: unknown, now: number): Gallery {
       continue;
     }
     const sources: Source[] = [];
-    for (const suffix of ['h', 'k', 'l', 'm', 's']) {
+    for (const suffix of RENDITIONS) {
       const url = flickrPhoto[`url_${suffix}`];
       const width = dimension(flickrPhoto[`width_${suffix}`]);
       const height = dimension(flickrPhoto[`height_${suffix}`]);
@@ -223,7 +221,7 @@ export function normalize(payload: unknown, now: number): Gallery {
         height &&
         validSource(url, flickrPhoto.id)
       ) {
-        sources.push({ url, width, height });
+        sources.push({ rendition: suffix, url, width, height });
       }
     }
     sources.sort((a, b) => b.width * b.height - a.width * a.height);
@@ -243,6 +241,15 @@ export function normalize(payload: unknown, now: number): Gallery {
   return { fetchedAt: new Date(now).toISOString(), photos };
 }
 
+/** Map old width URLs to an available rendition without resizing it. */
+function sourceForWidth(photo: Photo, width: number): Source {
+  return (
+    [...photo.sources]
+      .sort((a, b) => a.width - b.width)
+      .find((source) => source.width >= width) ?? photo.sources[0]
+  );
+}
+
 export function createHandler(dependencies: Dependencies) {
   // Concurrent cache misses share one Flickr request within this Worker instance.
   // Requests with a new API key do not reuse a pending request made with the old key.
@@ -253,7 +260,7 @@ export function createHandler(dependencies: Dependencies) {
     onCache?: (state: GalleryCacheState) => void,
   ): Promise<Gallery> {
     const cacheKey = new Request(
-      new URL('/__internal/gallery-v2', request.url),
+      new URL('/__internal/gallery-v3', request.url),
     );
     try {
       const hit = await dependencies.cache.match(cacheKey);
@@ -286,7 +293,7 @@ export function createHandler(dependencies: Dependencies) {
         page: '1',
         format: 'json',
         nojsoncallback: '1',
-        extras: 'url_s,url_m,url_l,url_k,url_h',
+        extras: RENDITIONS.map((size) => `url_${size}`).join(','),
       }).toString();
       let response: Response;
       const signal = AbortSignal.timeout(10000);
@@ -398,13 +405,20 @@ export function createHandler(dependencies: Dependencies) {
     }
     try {
       const url = new URL(request.url);
+      const rendition =
+        /^\/api\/photos\/renditions-v1\/(\d+)\/(s|m|n|z|c|l|h|k)\.jpg$/.exec(
+          url.pathname,
+        );
+      const metadata = url.pathname === '/api/photos/renditions-v1';
+      // Keep old URLs working for tabs opened before the rendition release.
       const direct = /^\/api\/photos\/source-v1\/(\d+)\.jpg$/.exec(
         url.pathname,
       );
       const image = /^\/api\/photos\/(\d+)\/(320|640|960|1440|1920)\.jpg$/.exec(
         url.pathname,
       );
-      if (url.pathname !== '/api/photos' && !image && !direct) {
+      const imageRequest = !!(rendition || image || direct);
+      if (url.pathname !== '/api/photos' && !metadata && !imageRequest) {
         return json({ error: 'not_found' }, 404);
       }
       if (request.method !== 'GET') {
@@ -414,23 +428,24 @@ export function createHandler(dependencies: Dependencies) {
       if (url.search) {
         return json({ error: 'query_parameters_not_allowed' }, 400);
       }
-      if (image || direct) {
+      if (imageRequest) {
         headers.append('Vary', 'Accept');
       }
-      const format =
-        image || direct ? negotiateFormat(request.headers.get('Accept')) : null;
-      if ((image || direct) && !format) {
+      const format = imageRequest
+        ? negotiateFormat(request.headers.get('Accept'))
+        : null;
+      if (imageRequest && !format) {
         return json({ error: 'not_acceptable' }, 406);
       }
       const key = env.FLICKR_API_KEY?.trim();
       if (!key) {
         return json({ error: 'service_not_configured' }, 503);
       }
-      if (image || direct) {
+      if (imageRequest) {
         timing = {
           event: 'photo_request_timing',
           requestId: crypto.randomUUID(),
-          mode: direct ? 'source-v1' : 'resized',
+          mode: rendition ? 'rendition' : 'legacy',
           galleryCache: 'miss',
           galleryMs: 0,
           status: 200,
@@ -445,49 +460,57 @@ export function createHandler(dependencies: Dependencies) {
       } finally {
         if (timing) timing.galleryMs = elapsed(galleryStart);
       }
-      if (!image && !direct) {
+      if (!imageRequest) {
         return json({
           fetchedAt: data.fetchedAt,
           limit: LIMIT,
-          photos: data.photos.map((p) => ({
-            ...p,
-            ...(env.PHOTO_LIGHTBOX_MODE === 'source-v1'
-              ? {
-                  fullSizeUrl: `${url.origin}/api/photos/source-v1/${p.id}.jpg`,
-                }
-              : {}),
-            variants: WIDTHS.map((width) => ({
-              width: Math.min(width, p.width),
-              url: `${url.origin}/api/photos/${p.id}/${width}.jpg`,
-            })),
+          photos: data.photos.map((photo) => ({
+            id: photo.id,
+            title: photo.title,
+            pageUrl: photo.pageUrl,
+            width: photo.width,
+            height: photo.height,
+            ...(metadata
+              ? {}
+              : {
+                  fullSizeUrl: `${url.origin}/api/photos/source-v1/${photo.id}.jpg`,
+                }),
+            variants: metadata
+              ? [...photo.sources]
+                  .sort((a, b) => a.width - b.width)
+                  .map((source) => ({
+                    rendition: source.rendition,
+                    width: source.width,
+                    height: source.height,
+                    url: `${url.origin}/api/photos/renditions-v1/${photo.id}/${source.rendition}.jpg`,
+                  }))
+              : LEGACY_WIDTHS.map((width) => ({
+                  width: sourceForWidth(photo, width).width,
+                  url: `${url.origin}/api/photos/${photo.id}/${width}.jpg`,
+                })),
           })),
         });
       }
-      const photoId = (direct ?? image)![1];
+      const photoId = (rendition ?? direct ?? image)![1];
       const photo = data.photos.find((p) => p.id === photoId);
       if (!photo) {
         return json({ error: 'photo_not_found' }, 404);
       }
-      const source = photo.sources[0];
-      // Requests that reach the Worker check membership before using a cached transform.
+      const source = rendition
+        ? photo.sources.find((source) => source.rendition === rendition[2])
+        : image
+          ? sourceForWidth(photo, Number(image[2]))
+          : photo.sources[0];
+      if (!source) {
+        return json({ error: 'rendition_not_found' }, 404);
+      }
+      // Check gallery membership before fetching a permitted Flickr rendition.
       let upstream: Response;
       const signal = AbortSignal.timeout(15000);
       const upstreamStart = dependencies.now();
       try {
         // workerd rejects redirect: 'error' before fetching. Manual + status checks never follows redirects.
         const options: RequestInit = { redirect: 'manual', signal };
-        if (image) {
-          options.cf = {
-            image: {
-              width: Number(image[2]),
-              fit: 'scale-down',
-              quality: 82,
-              format: format!,
-              metadata: 'none',
-            },
-          };
-        }
-        // Source requests omit cf.image entirely and stream the same Flickr rendition.
         upstream = await dependencies.fetch(source.url, options);
       } catch {
         throw new ServiceError(502, 'image_unavailable', {
@@ -502,11 +525,6 @@ export function createHandler(dependencies: Dependencies) {
           ? cacheState
           : 'UNKNOWN';
       }
-      const resizeHeader = upstream.headers.get('Cf-Resized');
-      const codeMatch = resizeHeader?.match(
-        /(?:^|[;,\s])err=(\d{4})(?=$|[;,\s])/,
-      );
-      const resizeCode = codeMatch ? Number(codeMatch[1]) : undefined;
       const contentType = upstream.headers
         .get('Content-Type')
         ?.split(';')[0]
@@ -525,17 +543,7 @@ export function createHandler(dependencies: Dependencies) {
         stage = 'image_http';
       } else if (upstream.redirected) {
         stage = 'image_redirect';
-      } else if (image && resizeCode !== undefined) {
-        stage = 'image_transform';
-      } else if (image && !resizeHeader) {
-        stage = 'image_untransformed';
-      }
-      // Cloudflare may fall back from AVIF. Only return a format this client accepts.
-      else if (
-        !actualFormat ||
-        (!direct &&
-          !negotiateFormat(request.headers.get('Accept'), [actualFormat]))
-      ) {
+      } else if (!actualFormat) {
         stage = 'image_format';
       }
       if (stage) {
@@ -547,13 +555,9 @@ export function createHandler(dependencies: Dependencies) {
         throw new ServiceError(502, 'image_unavailable', {
           stage,
           upstreamStatus: upstream.status,
-          ...(resizeCode === undefined ? {} : { resizeCode }),
         });
       }
-      if (
-        direct &&
-        !negotiateFormat(request.headers.get('Accept'), [actualFormat!])
-      ) {
+      if (!negotiateFormat(request.headers.get('Accept'), [actualFormat!])) {
         await upstream.body?.cancel();
         return json({ error: 'not_acceptable' }, 406);
       }
@@ -588,14 +592,12 @@ export function createHandler(dependencies: Dependencies) {
             ...error.diagnostic,
           }),
         );
-        const { stage, upstreamStatus, flickrCode, resizeCode } =
-          error.diagnostic;
+        const { stage, upstreamStatus, flickrCode } = error.diagnostic;
         headers.set(
           'X-Photo-Diagnostic',
           stage +
             (upstreamStatus === undefined ? '' : `_${upstreamStatus}`) +
-            (flickrCode === undefined ? '' : `_${flickrCode}`) +
-            (resizeCode === undefined ? '' : `_cf_${resizeCode}`),
+            (flickrCode === undefined ? '' : `_${flickrCode}`),
         );
       }
       return json({ error: error.code }, error.status);

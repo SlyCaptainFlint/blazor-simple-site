@@ -32,7 +32,7 @@ export async function renderGallery(
         'aria-label',
         `Open ${photo.title || `photograph ${index + 1}`}`,
       );
-      const image = previewImage(photo, index);
+      const image = previewImage(photo, index, photos.length);
       image.fetchPriority = 'auto';
       card.querySelector('img')!.replaceWith(image);
       if (image.complete && image.naturalWidth) {
@@ -162,12 +162,8 @@ function createLightbox(
       once: true,
     });
     image.sizes = `(max-aspect-ratio: ${photo.width}/${photo.height}) calc(100vw - 16px), calc((100dvh - 16px) * ${photo.width / photo.height})`;
-    if (photo.fullSizeUrl) {
-      image.src = photo.fullSizeUrl;
-    } else {
-      image.srcset = srcset(photo);
-      image.src = photo.variants.at(-1)!.url;
-    }
+    image.srcset = srcset(photo);
+    image.src = photo.variants.at(-1)!.url;
     wrap.replaceChildren(loading, image);
     // Fast cache hits and decodes finish before any loading affordance appears.
     loadingDelay = setTimeout(() => {

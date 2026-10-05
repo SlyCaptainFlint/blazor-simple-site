@@ -1,6 +1,7 @@
 export interface Variant {
   url: string;
   width: number;
+  height: number;
 }
 export interface Photo {
   id: string;
@@ -9,9 +10,8 @@ export interface Photo {
   width: number;
   height: number;
   variants: Variant[];
-  fullSizeUrl?: string;
 }
-const DEFAULT_API = '/api/photos';
+const DEFAULT_API = '/api/photos/renditions-v1';
 const LIVE_API_ORIGIN = 'https://ozinoveva-photos.ozinoveva.workers.dev';
 export const PHOTOS_API = import.meta.env.VITE_PHOTOS_API_URL || DEFAULT_API;
 const GALLERY_TTL = 60 * 60 * 1000;
@@ -86,7 +86,12 @@ async function fetchPhotos(): Promise<Photo[]> {
         typeof v.url !== 'string' ||
         !('width' in v) ||
         typeof v.width !== 'number' ||
-        v.width <= 0
+        !Number.isInteger(v.width) ||
+        v.width <= 0 ||
+        !('height' in v) ||
+        typeof v.height !== 'number' ||
+        !Number.isInteger(v.height) ||
+        v.height <= 0
       ) {
         throw new Error('Invalid image variant');
       }
@@ -94,9 +99,11 @@ async function fetchPhotos(): Promise<Photo[]> {
       if (
         (url.origin !== api.origin &&
           !(PHOTOS_API === DEFAULT_API && url.origin === LIVE_API_ORIGIN)) ||
-        !new RegExp(`^/api/photos/${p.id}/(320|640|960|1440|1920)\\.jpg$`).test(
-          url.pathname,
-        ) ||
+        !new RegExp(
+          `^/api/photos/renditions-v1/${p.id}/(s|m|n|z|c|l|h|k)\\.jpg$`,
+        ).test(url.pathname) ||
+        url.username ||
+        url.password ||
         url.search ||
         url.hash
       ) {
@@ -109,37 +116,16 @@ async function fetchPhotos(): Promise<Photo[]> {
             ? url.pathname
             : url.href,
         width: v.width,
+        height: v.height,
       };
     });
-    let fullSizeUrl: string | undefined;
-    if (p.fullSizeUrl !== undefined) {
-      if (typeof p.fullSizeUrl !== 'string')
-        throw new Error('Invalid source image');
-      const url = new URL(p.fullSizeUrl, api);
-      if (
-        (url.origin !== api.origin &&
-          !(PHOTOS_API === DEFAULT_API && url.origin === LIVE_API_ORIGIN)) ||
-        url.username ||
-        url.password ||
-        url.pathname !== `/api/photos/source-v1/${p.id}.jpg` ||
-        url.search ||
-        url.hash
-      ) {
-        throw new Error('Invalid source image');
-      }
-      fullSizeUrl =
-        PHOTOS_API === DEFAULT_API || url.origin === location.origin
-          ? url.pathname
-          : url.href;
-    }
     return {
       id: p.id,
       title: p.title,
       width: p.width,
       height: p.height,
       pageUrl: `https://www.flickr.com/photos/93665003@N05/${p.id}/`,
-      variants,
-      fullSizeUrl,
+      variants: variants.sort((a, b) => a.width - b.width),
     };
   });
   // Do not extend the Worker's metadata lifetime with a new client-side hour.
@@ -168,11 +154,27 @@ export function srcset(photo: Photo): string {
 }
 
 const PREVIEW_LIMIT = 4;
-const PREVIEW_SIZES =
-  '(max-width: 640px) calc((100vw - 24px) / 2), (max-width: 960px) calc((100vw - 48px) / 2), (max-width: 1280px) calc((100vw - 48px) / 3), 350px';
+/** Account for the extra image width hidden by the square gallery crop. */
+function previewSizes(photo: Photo, photoCount: number): string {
+  const crop = Math.max(1, photo.width / photo.height);
+  // Match the gallery's 4px gaps, main padding, and auto-fit columns.
+  const columns = (count: number) => Math.min(photoCount, count);
+  const slot = (count: number, viewport: string) =>
+    `calc((${viewport} - ${64 + 4 * (count - 1)}px) / ${count} * ${crop})`;
+  return [
+    `(max-width: 640px) calc((100vw - 28px) / 2 * ${crop})`,
+    `(max-width: 960px) calc((100vw - 68px) / 2 * ${crop})`,
+    `(max-width: 1195px) ${slot(columns(3), '100vw')}`,
+    slot(columns(4), 'min(100vw, 1440px)'),
+  ].join(', ');
+}
 
 /** Reuse a preloaded image so the gallery can display it immediately. */
-export function previewImage(photo: Photo, index: number): HTMLImageElement {
+export function previewImage(
+  photo: Photo,
+  index: number,
+  photoCount: number,
+): HTMLImageElement {
   const existing = previews.get(photo.id);
   if (existing) {
     return existing;
@@ -184,11 +186,8 @@ export function previewImage(photo: Photo, index: number): HTMLImageElement {
   image.decoding = 'async';
   image.loading = index < PREVIEW_LIMIT ? 'eager' : 'lazy';
   image.fetchPriority = 'low';
-  image.sizes = PREVIEW_SIZES;
-  image.srcset = srcset({
-    ...photo,
-    variants: photo.variants.filter((variant) => variant.width <= 640),
-  });
+  image.sizes = previewSizes(photo, photoCount);
+  image.srcset = srcset(photo);
   image.src = photo.variants[0].url;
   if (index < PREVIEW_LIMIT) {
     previews.set(photo.id, image);
@@ -246,7 +245,7 @@ export function startPhotoPreload(): void {
       ) {
         return;
       }
-      const image = previewImage(photo, index);
+      const image = previewImage(photo, index, photos.length);
       // One speculative transfer at a time; failures must not affect the page.
       try {
         await image.decode();
