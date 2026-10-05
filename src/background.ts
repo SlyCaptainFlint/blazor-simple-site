@@ -1,7 +1,8 @@
 const NS = 'http://www.w3.org/2000/svg';
 const INTRO_MS = 2600;
 const FRAME_MS = 1000 / 30;
-const AMBIENT_SPEED = 3.6;
+const AMBIENT_SPEED = 4.14;
+const MOBILE_INTRO_SPEED = 1.15;
 interface Cell {
   node: SVGPolygonElement;
   x: number;
@@ -24,6 +25,7 @@ export function startBackground(): void {
   const field = svg.querySelector<SVGGElement>('#hexagon-field')!;
   const toggle = document.querySelector<HTMLButtonElement>('#motion-toggle')!;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const mobile = matchMedia('(max-width: 640px)');
   let paused = reduced.matches;
   let elapsed = reduced.matches || location.pathname !== '/' ? INTRO_MS : 0;
   let ready = elapsed >= INTRO_MS;
@@ -32,11 +34,14 @@ export function startBackground(): void {
   let frame = 0;
   let cells: Cell[] = [];
   let paintedElapsed = -1;
+  let introSlope = 0.9;
+  let haloRadius = 0.235;
+  let haloWeight = 0.16;
 
   function paint(force = false): void {
     if (!force && elapsed === paintedElapsed) return;
     paintedElapsed = elapsed;
-    // Keep intro travel unchanged; only the ambient clock is accelerated.
+    // Intro and ambient progression have separate rates; rAF cadence stays fixed.
     const time =
       (Math.min(elapsed, INTRO_MS) +
         Math.max(0, elapsed - INTRO_MS) * AMBIENT_SPEED) /
@@ -81,11 +86,11 @@ export function startBackground(): void {
       const ridge =
         1.15 -
         reveal * 1.7 +
-        Math.abs(cell.x - 0.5) * 0.9 +
+        Math.abs(cell.x - 0.5) * introSlope +
         cell.roughness * 0.4;
       const offset = cell.y - ridge;
       const introCore = smooth(1 - (offset / 0.165) ** 2);
-      const introHalo = smooth(1 - (offset / 0.235) ** 2) * 0.16;
+      const introHalo = smooth(1 - (offset / haloRadius) ** 2) * haloWeight;
       const introLight = introCore + introHalo * (1 - introCore);
       const brightness =
         introLight * (1 - ambientBlend) + ambientLight * ambientBlend;
@@ -108,6 +113,11 @@ export function startBackground(): void {
   function resize(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
+    // Normalized x/y otherwise steepen the V on tall portrait screens. Cap its
+    // mobile pixel-space arm slope at 1 (a 90-degree apex), retaining desktop.
+    introSlope = mobile.matches ? Math.min(0.9, width / height) : 0.9;
+    haloRadius = mobile.matches ? 0.3 : 0.235;
+    haloWeight = mobile.matches ? 0.2 : 0.16;
     // Bound geometry to 280 polygons, with readable hexagons on narrow screens.
     let radius = Math.max(38, width / 32, Math.sqrt((width * height) / 620));
     while (
@@ -161,7 +171,17 @@ export function startBackground(): void {
 
   function tick(now: number): void {
     frame = 0;
-    if (previous) elapsed += now - previous;
+    if (previous) {
+      const delta = now - previous;
+      const introSpeed = mobile.matches ? MOBILE_INTRO_SPEED : 1;
+      // Split a frame crossing the intro boundary so its ambient remainder
+      // advances at the ambient rate, without inheriting the mobile intro rate.
+      const introDelta = Math.min(
+        delta,
+        Math.max(0, INTRO_MS - elapsed) / introSpeed,
+      );
+      elapsed += introDelta * introSpeed + (delta - introDelta);
+    }
     previous = now;
     // Keep deadlines anchored instead of resetting them to a rounded rAF time.
     // A small tolerance accommodates the browser's sub-millisecond timestamps.
@@ -214,7 +234,7 @@ export function startBackground(): void {
   resize();
   sync();
   // Do not spend intro time on initial page/font layout. The reveal still takes
-  // INTRO_MS of active time once the shell is ready, including after a pause.
+  // INTRO_MS of desktop active time (15% faster on mobile) once the shell is ready.
   const settle = (): void => {
     void document.fonts.ready.then(() => {
       ready = true;
