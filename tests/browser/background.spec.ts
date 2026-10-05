@@ -113,3 +113,34 @@ test('intro is an inverted V that travels upward before ambient islands', async 
     'ambient',
   );
 });
+
+test('font/layout preparation does not consume intro time', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const fonts = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/photos/renditions-v1', (route) =>
+    route.fulfill({ json: { photos: [] } }),
+  );
+  await page.route('**/*.woff2', async (route) => {
+    await fonts;
+    await route.continue();
+  });
+  try {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const svg = page.locator('#background-hexagons');
+    await expect(svg).toHaveAttribute('data-running', 'false');
+    await page.waitForTimeout(150);
+    await expect(svg).toHaveAttribute('data-elapsed', '0');
+    release();
+    await expect(svg).toHaveAttribute('data-running', 'true');
+    await expect(svg).toHaveAttribute('data-phase', 'intro');
+    await expect
+      .poll(async () => Number(await svg.getAttribute('data-elapsed')))
+      .toBeGreaterThan(0);
+  } finally {
+    release();
+  }
+});

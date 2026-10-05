@@ -1,7 +1,7 @@
 const NS = 'http://www.w3.org/2000/svg';
 const INTRO_MS = 2600;
 const FRAME_MS = 1000 / 30;
-const AMBIENT_SPEED = 2.4;
+const AMBIENT_SPEED = 3.6;
 interface Cell {
   node: SVGPolygonElement;
   x: number;
@@ -26,13 +26,17 @@ export function startBackground(): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let paused = reduced.matches;
   let elapsed = reduced.matches || location.pathname !== '/' ? INTRO_MS : 0;
+  let ready = elapsed >= INTRO_MS;
   let previous = 0;
   let nextPaint = 0;
   let frame = 0;
   let cells: Cell[] = [];
+  let paintedElapsed = -1;
 
-  function paint(): void {
-    // Keep the intro unchanged; ambient time runs 20% faster than the 2× loop.
+  function paint(force = false): void {
+    if (!force && elapsed === paintedElapsed) return;
+    paintedElapsed = elapsed;
+    // Keep intro travel unchanged; only the ambient clock is accelerated.
     const time =
       (Math.min(elapsed, INTRO_MS) +
         Math.max(0, elapsed - INTRO_MS) * AMBIENT_SPEED) /
@@ -41,24 +45,27 @@ export function startBackground(): void {
     const ambientBlend = smooth((reveal - 0.75) / 0.25);
     // Independently drifting, swelling ellipses overlap into irregular islands.
     // Different phases and axes avoid a repeating wave across the whole field.
-    const islands = [
-      [0.18, 0.2, 0.24, 0.28, 0.13, 0.17, 0.2],
-      [0.76, 0.32, 0.24, 0.23, 0.16, 0.11, 1.8],
-      [0.43, 0.56, 0.24, 0.29, 0.12, 0.15, 3.4],
-      [0.14, 0.84, 0.24, 0.27, 0.17, 0.13, 4.6],
-      [0.82, 0.79, 0.25, 0.28, 0.11, 0.19, 5.8],
-    ].map(([x, y, width, height, speedX, speedY, phase]) => {
-      const angle = Math.sin(time * speedY + phase) * 0.5;
-      const swell = 1 + Math.sin(time * 0.21 + phase) * 0.09;
-      return {
-        x: x + Math.sin(time * speedX + phase) * 0.09,
-        y: y + Math.cos(time * speedY + phase) * 0.08,
-        width: width * swell,
-        height: height / swell,
-        cos: Math.cos(angle),
-        sin: Math.sin(angle),
-      };
-    });
+    const islands =
+      ambientBlend > 0
+        ? [
+            [0.18, 0.2, 0.24, 0.28, 0.13, 0.17, 0.2],
+            [0.76, 0.32, 0.24, 0.23, 0.16, 0.11, 1.8],
+            [0.43, 0.56, 0.24, 0.29, 0.12, 0.15, 3.4],
+            [0.14, 0.84, 0.24, 0.27, 0.17, 0.13, 4.6],
+            [0.82, 0.79, 0.25, 0.28, 0.11, 0.19, 5.8],
+          ].map(([x, y, width, height, speedX, speedY, phase]) => {
+            const angle = Math.sin(time * speedY + phase) * 0.5;
+            const swell = 1 + Math.sin(time * 0.21 + phase) * 0.09;
+            return {
+              x: x + Math.sin(time * speedX + phase) * 0.09,
+              y: y + Math.cos(time * speedY + phase) * 0.08,
+              width: width * swell,
+              height: height / swell,
+              cos: Math.cos(angle),
+              sin: Math.sin(angle),
+            };
+          })
+        : [];
     for (const cell of cells) {
       let ambientLight = 0;
       for (const island of islands) {
@@ -76,7 +83,10 @@ export function startBackground(): void {
         reveal * 1.7 +
         Math.abs(cell.x - 0.5) * 0.9 +
         cell.roughness * 0.4;
-      const introLight = smooth(1 - ((cell.y - ridge) / 0.15) ** 2);
+      const offset = cell.y - ridge;
+      const introCore = smooth(1 - (offset / 0.165) ** 2);
+      const introHalo = smooth(1 - (offset / 0.235) ** 2) * 0.16;
+      const introLight = introCore + introHalo * (1 - introCore);
       const brightness =
         introLight * (1 - ambientBlend) + ambientLight * ambientBlend;
       const opacity = (brightness * (0.58 + cell.tone * 0.22)).toFixed(2);
@@ -146,7 +156,7 @@ export function startBackground(): void {
     }
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     field.replaceChildren(fragment);
-    paint();
+    paint(true);
   }
 
   function tick(now: number): void {
@@ -170,7 +180,7 @@ export function startBackground(): void {
     // Publish the current active time even between throttled paints, so a
     // paused resize renders precisely the same frozen instant.
     paint();
-    const running = !paused && !document.hidden;
+    const running = ready && !paused && !document.hidden;
     svg.dataset.running = String(running);
     toggle.textContent = paused ? 'Play animation' : 'Pause animation';
     toggle.setAttribute(
@@ -203,4 +213,16 @@ export function startBackground(): void {
   window.addEventListener('resize', resize, { passive: true });
   resize();
   sync();
+  // Do not spend intro time on initial page/font layout. The reveal still takes
+  // INTRO_MS of active time once the shell is ready, including after a pause.
+  const settle = (): void => {
+    void document.fonts.ready.then(() => {
+      ready = true;
+      sync();
+    });
+  };
+  if (!ready) {
+    if (document.readyState === 'complete') settle();
+    else window.addEventListener('load', settle, { once: true });
+  }
 }
