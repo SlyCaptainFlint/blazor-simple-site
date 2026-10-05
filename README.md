@@ -2,7 +2,7 @@
 
 A personal website built with TypeScript and Vite, served by Cloudflare Workers. It includes Home (`/`), About (`/about`), and Photography (`/photography`) pages. The photography gallery shows up to 50 recent public Flickr photos with responsive images and a keyboard-accessible lightbox.
 
-The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts, the portrait, and background assets are served locally.
+The navigation and animated background persist between pages. The background supports reduced-motion preferences and a pause/play control. Fonts and the portrait are served locally. The programmatic SVG background uses one shell-owned active-time clock: a 2.6-second home reveal followed by slowly drifting purple light clusters. Route navigation never restarts it. Geometry adapts on resize, opacity updates are capped at 30 Hz, and hidden tabs stop requesting frames. Reduced motion starts with a static field; the existing play control allows an explicit opt-in.
 
 ## Requirements and setup
 
@@ -48,7 +48,7 @@ Without this secret, the local site loads but the photo API returns `503`. Actua
 | `src/about.ts` | About page rendering. |
 | `src/gallery.ts` | Gallery rendering and lightbox interactions. |
 | `src/photos.ts` | Photo API loading and response validation. |
-| `src/background.ts` | Background playback and motion controls. |
+| `src/background.ts` | Responsive SVG hexagon field and shared animation clock. |
 | `src/style.css` | Site styles. |
 | `public/` | Static assets copied into the build. |
 | `backend/photos-worker/` | Flickr API and image transformation Worker. |
