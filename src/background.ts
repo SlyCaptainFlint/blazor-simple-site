@@ -1,13 +1,16 @@
 const NS = 'http://www.w3.org/2000/svg';
 const INTRO_MS = 2600;
 const FRAME_MS = 1000 / 30;
-const AMBIENT_SPEED = 2;
+const AMBIENT_SPEED = 3.6;
 interface Cell {
   node: SVGPolygonElement;
   x: number;
   y: number;
   tone: number;
+  roughness: number;
   opacity: string;
+  position: string;
+  scale: string;
 }
 const clamp = (value: number): number => Math.max(0, Math.min(1, value));
 const smooth = (value: number): number => {
@@ -23,51 +26,79 @@ export function startBackground(): void {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let paused = reduced.matches;
   let elapsed = reduced.matches || location.pathname !== '/' ? INTRO_MS : 0;
+  let ready = elapsed >= INTRO_MS;
   let previous = 0;
   let nextPaint = 0;
   let frame = 0;
   let cells: Cell[] = [];
+  let paintedElapsed = -1;
 
-  function paint(): void {
-    // Keep the intro unchanged, then move the light pools twice as quickly.
+  function paint(force = false): void {
+    if (!force && elapsed === paintedElapsed) return;
+    paintedElapsed = elapsed;
+    // Keep intro travel unchanged; only the ambient clock is accelerated.
     const time =
       (Math.min(elapsed, INTRO_MS) +
         Math.max(0, elapsed - INTRO_MS) * AMBIENT_SPEED) /
       1000;
-    const reveal = elapsed / INTRO_MS;
-    // Three broad, slowly drifting pools light neighboring cells without filters.
-    const pools = [
-      [
-        0.24 + 0.14 * Math.sin(time * 0.18),
-        0.68 + 0.18 * Math.cos(time * 0.13),
-      ],
-      [
-        0.76 + 0.13 * Math.cos(time * 0.14),
-        0.63 + 0.23 * Math.sin(time * 0.16),
-      ],
-      [
-        0.52 + 0.28 * Math.sin(time * 0.09),
-        0.18 + 0.12 * Math.cos(time * 0.12),
-      ],
-    ];
+    const reveal = clamp(elapsed / INTRO_MS);
+    const ambientBlend = smooth((reveal - 0.75) / 0.25);
+    // Independently drifting, swelling ellipses overlap into irregular islands.
+    // Different phases and axes avoid a repeating wave across the whole field.
+    const islands =
+      ambientBlend > 0
+        ? [
+            [0.18, 0.2, 0.24, 0.28, 0.13, 0.17, 0.2],
+            [0.76, 0.32, 0.24, 0.23, 0.16, 0.11, 1.8],
+            [0.43, 0.56, 0.24, 0.29, 0.12, 0.15, 3.4],
+            [0.14, 0.84, 0.24, 0.27, 0.17, 0.13, 4.6],
+            [0.82, 0.79, 0.25, 0.28, 0.11, 0.19, 5.8],
+          ].map(([x, y, width, height, speedX, speedY, phase]) => {
+            const angle = Math.sin(time * speedY + phase) * 0.5;
+            const swell = 1 + Math.sin(time * 0.21 + phase) * 0.09;
+            return {
+              x: x + Math.sin(time * speedX + phase) * 0.09,
+              y: y + Math.cos(time * speedY + phase) * 0.08,
+              width: width * swell,
+              height: height / swell,
+              cos: Math.cos(angle),
+              sin: Math.sin(angle),
+            };
+          })
+        : [];
     for (const cell of cells) {
-      let light = 0;
-      for (const [x, y] of pools) {
+      let ambientLight = 0;
+      for (const island of islands) {
+        const dx = cell.x - island.x;
+        const dy = cell.y - island.y;
         const distance =
-          ((cell.x - x) / 0.18) ** 2 + ((cell.y - y) / 0.24) ** 2;
-        light = Math.max(light, Math.max(0, 1 - distance));
+          ((dx * island.cos + dy * island.sin) / island.width) ** 2 +
+          ((dy * island.cos - dx * island.sin) / island.height) ** 2 +
+          cell.roughness;
+        ambientLight = Math.max(ambientLight, smooth((1 - distance) / 0.8));
       }
-      const sweep = smooth(
-        (reveal * 1.65 - (1 - cell.y) * 0.65 - Math.abs(cell.x - 0.5) * 0.3) /
-          0.3,
-      );
-      const opacity = (
-        (0.12 + light * (0.58 + cell.tone * 0.22)) *
-        sweep
-      ).toFixed(2);
+      // A narrow, rough inverted V travels upwards, then dissolves into islands.
+      const ridge =
+        1.15 -
+        reveal * 1.7 +
+        Math.abs(cell.x - 0.5) * 0.9 +
+        cell.roughness * 0.4;
+      const offset = cell.y - ridge;
+      const introCore = smooth(1 - (offset / 0.165) ** 2);
+      const introHalo = smooth(1 - (offset / 0.235) ** 2) * 0.16;
+      const introLight = introCore + introHalo * (1 - introCore);
+      const brightness =
+        introLight * (1 - ambientBlend) + ambientLight * ambientBlend;
+      const opacity = (brightness * (0.58 + cell.tone * 0.22)).toFixed(2);
+      // Size and light share one envelope: 80% when dark, 100% at full light.
+      const scale = (0.8 + brightness * 0.2).toFixed(3);
       if (opacity !== cell.opacity) {
         cell.node.setAttribute('opacity', opacity);
         cell.opacity = opacity;
+      }
+      if (scale !== cell.scale) {
+        cell.node.setAttribute('transform', `${cell.position} scale(${scale})`);
+        cell.scale = scale;
       }
     }
     svg.dataset.elapsed = String(Math.round(elapsed));
@@ -101,21 +132,31 @@ export function startBackground(): void {
         const tone = ((col * 17 + row * 31) % 19) / 18;
         const node = document.createElementNS(NS, 'polygon');
         node.setAttribute('points', points);
-        node.setAttribute(
-          'transform',
-          `translate(${x.toFixed(2)} ${y.toFixed(2)})`,
-        );
+        const position = `translate(${x.toFixed(2)} ${y.toFixed(2)})`;
         node.setAttribute(
           'fill',
           tone > 0.55 ? '#c88cce' : tone > 0.25 ? '#85349f' : '#5809a0',
         );
         fragment.append(node);
-        cells.push({ node, x: x / width, y: y / height, tone, opacity: '' });
+        cells.push({
+          node,
+          x: x / width,
+          y: y / height,
+          tone,
+          roughness:
+            (tone - 0.5) * 0.09 +
+            Math.sin((x / width) * 17 + (y / height) * 11) *
+              Math.sin((y / height) * 19 - (x / width) * 7) *
+              0.08,
+          position,
+          opacity: '',
+          scale: '',
+        });
       }
     }
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     field.replaceChildren(fragment);
-    paint();
+    paint(true);
   }
 
   function tick(now: number): void {
@@ -139,7 +180,7 @@ export function startBackground(): void {
     // Publish the current active time even between throttled paints, so a
     // paused resize renders precisely the same frozen instant.
     paint();
-    const running = !paused && !document.hidden;
+    const running = ready && !paused && !document.hidden;
     svg.dataset.running = String(running);
     toggle.textContent = paused ? 'Play animation' : 'Pause animation';
     toggle.setAttribute(
@@ -172,4 +213,16 @@ export function startBackground(): void {
   window.addEventListener('resize', resize, { passive: true });
   resize();
   sync();
+  // Do not spend intro time on initial page/font layout. The reveal still takes
+  // INTRO_MS of active time once the shell is ready, including after a pause.
+  const settle = (): void => {
+    void document.fonts.ready.then(() => {
+      ready = true;
+      sync();
+    });
+  };
+  if (!ready) {
+    if (document.readyState === 'complete') settle();
+    else window.addEventListener('load', settle, { once: true });
+  }
 }
