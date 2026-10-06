@@ -55,6 +55,12 @@ export function startBackground(): void {
       startedWithIntro && !reduced.matches
         ? 0.8 + 0.06 * smooth((elapsed - INTRO_MS) / 600)
         : 0.86;
+    // Strengthen the idle feather by 30% near the core. Keep the faint outer
+    // edge unchanged so the islands retain their active footprint and count.
+    const coreFeather =
+      startedWithIntro && !reduced.matches
+        ? 0.018 * smooth((elapsed - INTRO_MS) / 600)
+        : 0.018;
     // Independently drifting, swelling ellipses overlap into irregular islands.
     // Different phases and axes avoid a repeating wave across the whole field.
     const islands =
@@ -89,7 +95,10 @@ export function startBackground(): void {
           cell.roughness;
         ambientLight = Math.max(
           ambientLight,
-          smooth((1 - distance) / ambientEdge),
+          smooth(
+            (1 - distance) /
+              (ambientEdge + coreFeather * smooth((0.8 - distance) / 0.2)),
+          ),
         );
       }
       // A narrow, rough inverted V travels upwards, then dissolves into islands.
