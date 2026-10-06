@@ -154,19 +154,19 @@ test('only mobile intro finishes early, while update cadence stays at 30 Hz', as
   const paints = Number(await svg.getAttribute('data-test-paints'));
   expect(paints).toBeGreaterThanOrEqual(28);
   expect(paints).toBeLessThanOrEqual(32);
-  const expectedRate = page.viewportSize()!.width <= 640 ? 1.15 : 1;
+  const expectedRate = page.viewportSize()!.width <= 640 ? 1.3225 : 1;
   expect(Number(await svg.getAttribute('data-test-rate'))).toBeCloseTo(
     expectedRate,
     2,
   );
-  await page.clock.runFor(1250);
+  await page.clock.runFor(900);
   await expect(svg).toHaveAttribute('data-phase', 'intro');
-  await page.clock.runFor(100);
+  await page.clock.runFor(150);
   await expect(svg).toHaveAttribute(
     'data-phase',
     page.viewportSize()!.width <= 640 ? 'ambient' : 'intro',
   );
-  await page.clock.runFor(400);
+  await page.clock.runFor(700);
   await expect(svg).toHaveAttribute('data-phase', 'ambient');
 });
 
@@ -211,8 +211,8 @@ test('a taller portrait keeps the wider V and preserves intro progress on resize
         meanY(cells.filter((cell) => Math.abs(cell.x - 0.5) < 0.15))
       );
     });
-    expect(rise).toBeGreaterThan(90);
-    expect(rise).toBeLessThan(190);
+    expect(rise).toBeGreaterThan(60);
+    expect(rise).toBeLessThan(130);
     rises.push(rise);
   }
   expect(Math.abs(rises[1] - rises[0])).toBeLessThan(40);

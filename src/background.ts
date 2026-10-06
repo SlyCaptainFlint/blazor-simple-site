@@ -2,7 +2,7 @@ const NS = 'http://www.w3.org/2000/svg';
 const INTRO_MS = 2600;
 const FRAME_MS = 1000 / 30;
 const AMBIENT_SPEED = 4.14;
-const MOBILE_INTRO_SPEED = 1.15;
+const MOBILE_INTRO_SPEED = 1.3225;
 interface Cell {
   node: SVGPolygonElement;
   x: number;
@@ -28,6 +28,7 @@ export function startBackground(): void {
   const mobile = matchMedia('(max-width: 640px)');
   let paused = reduced.matches;
   let elapsed = reduced.matches || location.pathname !== '/' ? INTRO_MS : 0;
+  const startedWithIntro = elapsed < INTRO_MS;
   let ready = elapsed >= INTRO_MS;
   let previous = 0;
   let nextPaint = 0;
@@ -48,6 +49,12 @@ export function startBackground(): void {
       1000;
     const reveal = clamp(elapsed / INTRO_MS);
     const ambientBlend = smooth((reveal - 0.75) / 0.25);
+    // Preserve the reveal's lighting, then gently narrow the brightest core.
+    // Direct routes and reduced motion use the softer idle profile immediately.
+    const ambientEdge =
+      startedWithIntro && !reduced.matches
+        ? 0.8 + 0.06 * smooth((elapsed - INTRO_MS) / 600)
+        : 0.86;
     // Independently drifting, swelling ellipses overlap into irregular islands.
     // Different phases and axes avoid a repeating wave across the whole field.
     const islands =
@@ -80,7 +87,10 @@ export function startBackground(): void {
           ((dx * island.cos + dy * island.sin) / island.width) ** 2 +
           ((dy * island.cos - dx * island.sin) / island.height) ** 2 +
           cell.roughness;
-        ambientLight = Math.max(ambientLight, smooth((1 - distance) / 0.8));
+        ambientLight = Math.max(
+          ambientLight,
+          smooth((1 - distance) / ambientEdge),
+        );
       }
       // A narrow, rough inverted V travels upwards, then dissolves into islands.
       const ridge =
@@ -114,8 +124,8 @@ export function startBackground(): void {
     const width = window.innerWidth;
     const height = window.innerHeight;
     // Normalized x/y otherwise steepen the V on tall portrait screens. Cap its
-    // mobile pixel-space arm slope at 1 (a 90-degree apex), retaining desktop.
-    introSlope = mobile.matches ? Math.min(0.9, width / height) : 0.9;
+    // mobile pixel-space arm slope at 0.7 (a 110-degree apex), retaining desktop.
+    introSlope = mobile.matches ? Math.min(0.9, (width / height) * 0.7) : 0.9;
     haloRadius = mobile.matches ? 0.3 : 0.235;
     haloWeight = mobile.matches ? 0.2 : 0.16;
     // Bound geometry to 280 polygons, with readable hexagons on narrow screens.
@@ -234,7 +244,7 @@ export function startBackground(): void {
   resize();
   sync();
   // Do not spend intro time on initial page/font layout. The reveal still takes
-  // INTRO_MS of desktop active time (15% faster on mobile) once the shell is ready.
+  // INTRO_MS of desktop active time (32.25% faster on mobile) once the shell is ready.
   const settle = (): void => {
     void document.fonts.ready.then(() => {
       ready = true;
