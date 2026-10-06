@@ -101,7 +101,7 @@ Configure **Settings → Environments → production** in GitHub:
 
 1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off and disable administrator bypass.
 2. Allow deployments from the `master` branch only, with no allowed tags.
-3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The token needs **Account → Workers Scripts → Edit**, scoped to the deployment account.
+3. Ensure GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are available. The workflow uses the existing repository secrets; no environment copies are required. Optional environment secrets with the same names take precedence over repository secrets. The token needs **Account → Workers Scripts → Edit**, scoped to the deployment account.
 
 Configure `FLICKR_API_KEY` as a secret on the Cloudflare Worker. The publishing workflow does not set or rotate it.
 
@@ -115,11 +115,11 @@ Configure **Settings → Environments → staging** in GitHub before the first r
 
 1. Set `SlyCaptainFlint` as the only required reviewer. Leave **Prevent self-review** off and disable administrator bypass.
 2. Under **Deployment branches and tags**, choose **Selected branches and tags**. Add a rule with **Ref type: Branch** and name pattern `**/*`, which covers branch names with any number of `/` separators, including none. Do not add any **Tag** rules. GitHub uses [Ruby `fnmatch` patterns](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments#deployment-branches-and-tags); the recursive `**/` prefix covers nested branch names.
-3. Add environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use a dedicated token with **Account → Workers Scripts → Edit**, scoped to the deployment account. This permission applies to Workers across that account; it is not restricted to the staging Worker name. Keep these secrets in the environment rather than at repository scope.
+3. Reuse the existing repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; staging does not require duplicate environment secrets or a separate token. To use different credentials for staging, optionally add secrets with the same names to the `staging` environment; these override the repository values. The token needs **Account → Workers Scripts → Edit**, scoped to the deployment account. This permission applies to Workers across that account; it is not restricted to the staging Worker name.
 
 After this workflow has been merged into the default branch, open **Actions → staging publish → Run workflow** and select any branch containing the workflow and staging configuration. Nested branch names are supported; tags are rejected. Only `SlyCaptainFlint` may initiate or rerun it. Review the selected commit before approving the staging environment: the selected branch supplies the code and workflow that will run. The workflow validates the site, tests both routing configurations, performs a staging dry-run, and publishes that commit. It does not run automatically on pushes or pull requests.
 
-After the first staging publish, set the `FLICKR_API_KEY` secret on **`ozinoveva-photos-staging`** in Cloudflare. Secrets are configured separately for each Worker; the production secret is not inherited. The same Flickr key may be used, sharing its quota. Until the secret is configured, the staging site loads but the photo API returns `503`. The workflow does not set or rotate this secret. Subsequent publishes retain it.
+After the first staging publish, set the `FLICKR_API_KEY` secret on **`ozinoveva-photos-staging`** in Cloudflare. Secrets are configured separately for each Worker; the production secret is not inherited. The same Flickr key may be used, sharing its quota. Until the secret is configured, the staging site loads but the photo API returns `503`. Neither publishing workflow transfers a GitHub `FLICKR_API_KEY` secret to Cloudflare. Subsequent publishes retain the existing Worker secret.
 
 Photo requests use `/api/photos/renditions-v1` on the staging origin. The workflow explicitly sets that build-time endpoint. Staging is publicly accessible at its `workers.dev` URL unless Cloudflare Access is configured separately.
 
